@@ -2,6 +2,7 @@
 CXX = g++
 CXXFLAGS = -Wall -std=c++17 -Iinclude
 
+
 # Source and build paths
 SRC_DIR = src
 INC_DIR = include
