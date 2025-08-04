@@ -5,6 +5,33 @@
 
 Game::Game() : isRunning(true) {}
 
+void Game::displayMainMenu() {
+    int choice;
+    do {
+        std::cout << "\n==== THE ORACLES ARE BLEEDING ====\n";
+        std::cout << "1. Begin Descent\n";
+        std::cout << "2. Accessibility Options\n";
+        std::cout << "3. Exit\n";
+        std::cout << "Choice: ";
+        std::cin >> choice;
+        std::cin.ignore();
+
+        switch (choice) {
+            case 1:
+                start();  // begin game loop
+                break;
+            case 2:
+                toggleAccessibility();
+                break;
+            case 3:
+                isRunning = false;
+                break;
+            default:
+                std::cout << "The gods do not understand that choice.\n";
+        }
+    } while (isRunning);
+}
+
 void Game::start() {
     SceneManager::introScene();
     loadRooms();
