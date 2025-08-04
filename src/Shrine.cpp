@@ -10,4 +10,10 @@ void Shrine::activate(int shrineID, Player& player) {
         default:
             std::cout << "The altar is cold and unresponsive.\n";
     }
+
+
+player.writeToJournal("I knelt at the altar. The wheat whispered a name I no longer answer to.");
+if (player.getSanity() < 40) {
+    player.writeToJournal("I saw something behind me, written in my own voice.");
+    player.writeCorruptedToJournal(); // or just: player.journal.writeCorrupted();
 }
