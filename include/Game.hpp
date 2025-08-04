@@ -9,6 +9,13 @@
 #include <vector>
 #include <string>
 
+enum class GameState {
+    MENU,
+    RUNNING,
+    QUITa
+};
+
+
 class Game {
 private:
     Player player;
