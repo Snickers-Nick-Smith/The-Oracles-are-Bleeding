@@ -17,3 +17,4 @@ if (player.getSanity() < 40) {
     player.writeToJournal("I saw something behind me, written in my own voice.");
     player.writeCorruptedToJournal(); // or just: player.journal.writeCorrupted();
 }
+}
