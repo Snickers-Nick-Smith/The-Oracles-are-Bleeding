@@ -1,36 +1,39 @@
-# 🕯️ The Oracles are Bleeding
+🕯️ The Oracles are Bleeding
+A mythological horror game written in C++. Wander the sacred halls of a dying temple, face the silence of the divine, and survive the whispers of chaos.
 
-A mythological horror game written in C++. Wander the dead shrines of forgotten gods, survive the whispers of chaos, and uncover the rot beneath prophecy.
+🧿 About the Game
+The Oracles are Bleeding is a dark, text-based horror game inspired by ancient myth and tragedy.
+You are an oracle on a desperate mission to awaken the gods during a divine drought — but something answers your prayers that isn’t what you were expecting.
 
----
+Explore forgotten shrines, confront powers that do not speak, and uncover the truth behind the temple’s decay. The path you walk will shape your fate.
 
-## 🧿 About the Game
+⚙️ Features
+🏺 Mythology through a psychological horror lens
 
-**The Oracles are Bleeding** is a dark, text-based horror game inspired by ancient Greek myth and tragedy. You play as **Melas**, a cursed oracle driven to awaken the gods — or die trying — during a divine drought. But something answers your prayers that isn’t who you're expecting.
+🧠 Dialogue-driven puzzles and riddle trials
 
-Explore haunted shrines, confront mythic forces like **Demeter**, **Thanatos**, and **Hecate**, and survive trials that test more than just your mind.
+🩸 Morality systems shaped by fear, defiance, and fate
 
----
+🧭 Shrine-based exploration with branching paths
 
-## ⚙️ Features
+🔁 Multiple endings influenced by your choices
 
-- 🏺 Greek myth with a psychological horror twist
-- 🧠 Dialogue-driven puzzles and riddle trials
-- 🩸 Morality systems based on fear, defiance, and fate
-- 🧭 Branching paths and shrine-based exploration
-- 🔁 Multiple endings
-- 🛠️ Written entirely in modern C++
+🛠 Written entirely in modern C++
 
----
+🎮 How to Play
+Requirements
+C++17 or later (e.g. g++, clang++, or MSVC)
 
-## 🎮 How to Play
+A terminal or command prompt window
 
-### Requirements
-- C++17 or later (e.g. `g++`, `clang++`, or MSVC)
-- A terminal or command prompt window
+Compile and Run
 
-### Compile and Run
-```bash
+bash
 g++ -std=c++17 -o oracles src/main.cpp
 ./oracles
+
+
+🩸 The Warning
+The temple remembers everything.
+So will you.
 
