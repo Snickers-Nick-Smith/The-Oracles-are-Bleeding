@@ -1,0 +1,45 @@
+# ==============================
+#   Developer Notes (Private)
+# ==============================
+DEV_NOTES_README.md
+docs/DEV_NOTES_README.md
+
+# ==============================
+#   Build artifacts
+# ==============================
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.out
+*.exe
+
+# ==============================
+#   CMake
+# ==============================
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+build/
+
+# ==============================
+#   Code::Blocks / CLion / VSCode
+# ==============================
+*.cbp
+*.depend
+*.layout
+.idea/
+.vscode/
+*.user
+*.workspace
+
+# ==============================
+#   Logs / Misc
+# ==============================
+*.log
+*.tmp
+*.temp
