@@ -23,6 +23,7 @@ public:
     const std::vector<std::string>& getObjects() const;
     bool isVisited() const;
     void markVisited();
+    bool isShrine() const { return hasShrine; }
 };
 
 #endif

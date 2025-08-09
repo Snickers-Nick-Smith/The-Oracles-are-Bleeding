@@ -25,6 +25,12 @@ public:
     void viewJournal() const;
     void saveJournalToFile() const;
     void loadJournalFromFile();
+    void writeMelasAt(const std::string& locationID, bool forceHallucination = false);
+    void addJournalNote(int entryIndexOneBased, const std::string& note);
+    void printJournal();
+    void inspectJournalEntry(int index) const { journal.inspectEntry(index); }
+
+
 };
 
 #endif

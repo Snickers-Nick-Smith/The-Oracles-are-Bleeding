@@ -1,14 +1,185 @@
-// JournalManager.cpp (Split System Implementation)
+// JournalManager.cpp (Location-aware, dual journals, hallucinations)
 #include "JournalManager.hpp"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <algorithm>
 
-// --- Lysaia Journal (Read-only) ---
+// -----------------------------
+// Helper: generic hallucination pool
+// -----------------------------
+static const char* kGenericHallucinations[] = {
+    "She was never gone.",
+    "The temple sings when no one listens.",
+    "Do not trust what you wrote.",
+    "You were warned.",
+    "Cassandra is a curse.",
+    "You already died once.",
+    "The shrines are listening.",
+    "There were more of you. There aren't now.",
+    "The walls remember every step you take.",
+    "You have been here longer than the temple.",
+    "The dust knows your name.",
+    "You are not the only one wearing your skin.",
+    "Every shadow is counting down.",
+    "You left something breathing in the last room.",
+    "You’re walking in the wrong direction.",
+    "They are speaking about you in the walls.",
+    "You forgot the word for leaving.",
+    "The floor is warmer when you stand still.",
+    "Something is following you inside your own breath.",
+    "You carried this place inside you.",
+    "The silence is watching for you to speak.",
+    "You will not recognize your reflection next time.",
+    "Your heartbeat does not belong to you anymore.",
+    "You are the only one who thinks you’re alive.",
+    "The light is bending away from you.",
+    "Someone else wrote this before you.",
+    "Your hands are not where you left them.",
+    "The air here remembers your scent.",
+    "You’ll see her again, but not how you want.",
+    "The next door leads to where you started.",
+    "You are filling someone else’s footsteps.",
+    "The echo is getting ahead of you.",
+    "You will not survive telling the truth.",
+    "Your eyes will close before you mean them to.",
+    "The next breath will not be yours.",
+    "Every word you’ve written is already gone.",
+    "You’ve been answering questions no one asked.",
+    "The temple keeps count, even when you forget.",
+};
 
+// -----------------------------
+// Definitions / Registry
+// -----------------------------
+void JournalManager::defineLocationEntry(const std::string& id,
+                                         const std::string& actual,
+                                         const std::string& hallucination) {
+    locationEntries[id] = EntryData{actual, hallucination};
+}
+
+void JournalManager::loadDefaultLocationEntries() {
+    // NOTE: IDs use the form "deity/room/<slug>" or "deity/shrine"
+    // Keep lines concise; you can revise anytime.
+
+    // --- PERSEPHONE ---
+    defineLocationEntry("persephone/room/hall_of_petals",
+        "Petals drifted like snow. I wrote her name and it did not sting.",
+        "The petals were ash. You coughed blood and called it perfume.");
+    defineLocationEntry("persephone/room/orchard_walk",
+        "Fruit hung heavy. Choice tasted sweet and strange.",
+        "You spat the seeds into the well and wished for winter.");
+    defineLocationEntry("persephone/shrine",
+        "The fountain promised return without regret.",
+        "The seed in the bowl has your tooth-marks.");
+
+    // --- DEMETER ---
+    defineLocationEntry("demeter/room/garden_of_broken_faces",
+        "Offerings wore smiling masks; I remember the grain was gold.",
+        "They were not masks. They watched you chew.");
+    defineLocationEntry("demeter/room/threadbare_womb",
+        "The shrine asked for patience, not blood.",
+        "You rocked the empty cradle until it cried.");
+    defineLocationEntry("demeter/shrine",
+        "I prayed for harvest, not hunger.",
+        "The bowls were already moving when you arrived.");
+
+    // --- NYX ---
+    defineLocationEntry("nyx/room/no_corners",
+        "Edges softened; night held me without fear.",
+        "You walked in circles and called it mercy.");
+    defineLocationEntry("nyx/room/nest_of_wings",
+        "A single feather fell and did not touch the floor.",
+        "The wings were yours. You remember plucking.");
+    defineLocationEntry("nyx/shrine",
+        "I traded a memory for a quieter sky.",
+        "You forgot how to breathe on purpose.");
+
+    // --- APOLLO ---
+    defineLocationEntry("apollo/room/hall_of_echoes",
+        "The echo answered kindly, a half-beat late.",
+        "It answered before you spoke.");
+    defineLocationEntry("apollo/room/room_that_remembers",
+        "Reflections kept time; mine looked brave enough.",
+        "The mirror moved first and smiled with your broken teeth.");
+    defineLocationEntry("apollo/shrine",
+        "A riddle about light; I chose the honest lie.",
+        "There was never an answer. You just stopped asking.");
+
+    // --- HECATE ---
+    defineLocationEntry("hecate/room/loom_of_names",
+        "Threads hummed; my name held fast among them.",
+        "Your thread was cut and you tucked the end into your sleeve.");
+    defineLocationEntry("hecate/room/listening_chamber",
+        "Lantern-breath on shells; old hymns remembered me.",
+        "They repeated your breath after you stopped breathing.");
+    defineLocationEntry("hecate/shrine",
+        "Three ways; I lit the past to learn the present.",
+        "You chose the door that opens into you.");
+
+    // --- THANATOS ---
+   defineLocationEntry("thanatos/room/room_of_waiting_lights",
+    "No candles were lit when I entered, but one flared to life... then another, without my touch.",
+    "Each flame pretended to warm me, but their light only deepened the cold.");
+    
+defineLocationEntry("thanatos/room/waiting_room",
+    "The chairs faced me in silent expectation; I could not bring myself to sit.",
+    "Every chair knew my weight before I placed it there.");
+
+    defineLocationEntry("thanatos/shrine",
+        "I stood beside the bed and counted laurel leaves.",
+        "You laid down already. The counting was the dream.");
+
+    // --- FALSE HERMES ---
+    defineLocationEntry("false_hermes/room/borrowed_things",
+        "Names hung from trinkets; none were mine.",
+        "Your tag was blank because you carved it off.");
+    defineLocationEntry("false_hermes/room/whispering_hall",
+        "Every word unique, like footprints in wet clay.",
+        "Your handwriting shouted your old name until it bled.");
+    defineLocationEntry("false_hermes/shrine",
+        "I stopped after twenty steps and turned back.",
+        "You never stopped. You are still counting.");
+
+    // --- PAN ---
+    defineLocationEntry("pan/room/hall_of_shivering_meat",
+        "Stone twitched like muscle—alive, not cruel.",
+        "It breathed on your neck and you answered.");
+    defineLocationEntry("pan/room/den_of_antlers",
+        "Bone and branch braided; the air smelled of pine.",
+        "Not all the fur was animal. You kept some.");
+    defineLocationEntry("pan/shrine",
+        "The melody was simple; I learned the pauses.",
+        "You missed a note. He noticed.");
+
+    // --- ERIS ---
+    defineLocationEntry("eris/room/throat_of_temple",
+        "The passage narrowed kindly, like a throat before a song.",
+        "You walked backwards without turning around.");
+    defineLocationEntry("eris/room/oracles_wake",
+        "Candles steadied in windless dark; the altar listened.",
+        "You carved the sentence twenty-seven times and none were yours.");
+    defineLocationEntry("eris/room/archivists_cell",
+        "I faced the wall to write the truth smaller.",
+        "The chair is warm because you never left.");
+    defineLocationEntry("eris/shrine",
+        "The choir remembered every vow I never sang.",
+        "Their hymn is your name pronounced wrong on purpose.");
+}
+
+// -----------------------------
+// Lysaia (read-only to player)
+// -----------------------------
 void JournalManager::writeLysaia(const std::string& entry) {
     lysaiaEntries.emplace_back(entry);
-    showLysaiaJournal = true; // Enable visibility during Lysaia's playthrough
+    showLysaiaJournal = true; // visible during her playthrough
+}
+
+void JournalManager::writeLysaiaAt(const std::string& locationID) {
+    auto it = locationEntries.find(locationID);
+    if (it != locationEntries.end()) {
+        writeLysaia(it->second.actual);
+    }
 }
 
 void JournalManager::viewLysaia() const {
@@ -16,25 +187,50 @@ void JournalManager::viewLysaia() const {
         std::cout << "You have no access to these entries right now.\n";
         return;
     }
-    std::cout << "\n--- Lysaia's Journal ---\n";
+
+    if (lysaiaEntries.empty()) {
+        std::cout << "Lysaia's journal is empty.\n";
+        return;
+    }
+
+    std::cout << "\n=== Lysaia's Journal ===\n";
     for (size_t i = 0; i < lysaiaEntries.size(); ++i) {
-        std::cout << "\nDay " << i + 1 << ":\n";
+        std::cout << "\nEntry " << i + 1 << ":\n";
         std::cout << lysaiaEntries[i].content << "\n";
     }
+    std::cout << "========================\n";
 }
 
 void JournalManager::unlockLysaiaJournal() {
     showLysaiaJournal = true;
 }
 
-// --- Melas Journal (Interactive) ---
-
+// -----------------------------
+// Melas (interactive)
+// -----------------------------
 void JournalManager::writeMelas(const std::string& entry) {
     melasEntries.emplace_back(entry);
-
-    // 50% chance to add a hallucination
-    if (rand() % 2 == 0) {
+    // 50% chance to add a generic hallucination
+    if (std::rand() % 2 == 0) {
         writeCorrupted();
+    }
+
+}
+
+void JournalManager::writeMelasAt(const std::string& locationID, bool forceHallucination) {
+    auto it = locationEntries.find(locationID);
+    if (it == locationEntries.end()) {
+        // fallback: write id as plain text to help debugging
+        writeMelas("[" + locationID + "]");
+        return;
+    }
+
+    // Write the true entry for this location
+    melasEntries.emplace_back(it->second.actual);
+
+    // 50% chance (or forced) to add the paired hallucination
+    if (forceHallucination || (std::rand() % 2 == 0)) {
+        writeCorruptedLine(it->second.hallucination);
     }
 }
 
@@ -45,26 +241,33 @@ void JournalManager::addPlayerNoteToMelas(int index, const std::string& note) {
 }
 
 void JournalManager::viewMelas() const {
-    std::cout << "\n--- Your Journal ---\n";
+    if (melasEntries.empty()) {
+        std::cout << "Your journal is empty.\n";
+        return;
+    }
+
+    std::cout << "\n=== Your Journal ===\n";
     for (size_t i = 0; i < melasEntries.size(); ++i) {
         std::cout << "\nEntry " << i + 1 << ":\n";
         std::cout << melasEntries[i].content << "\n";
         if (!melasEntries[i].playerNote.empty()) {
-            std::cout << "\n[Your Note]: " << melasEntries[i].playerNote << "\n";
+            std::cout << "[Your Note]: " << melasEntries[i].playerNote << "\n";
         }
     }
+    std::cout << "====================\n";
 }
 
-// --- File I/O (shared) ---
-
+// -----------------------------
+// File I/O (Melas only)
+// -----------------------------
 void JournalManager::saveToFile(const std::string& filename) const {
     std::ofstream out(filename);
     if (!out) return;
 
     for (const auto& entry : melasEntries) {
-        out << "[ENTRY]\n" << entry.content << "\n";
+        out << "[ENTRY]" << entry.content << ""; 
         if (!entry.playerNote.empty()) {
-            out << "[NOTE]\n" << entry.playerNote << "\n";
+            out << "[NOTE]" << entry.playerNote << "";
         }
     }
     out.close();
@@ -87,19 +290,78 @@ void JournalManager::loadFromFile(const std::string& filename) {
     in.close();
 }
 
-// --- Corrupted Entry (hallucination) ---
-
+// -----------------------------
+// Hallucinations
+// -----------------------------
 void JournalManager::writeCorrupted() {
-    static const std::vector<std::string> hallucinations = {
-        "She was never gone.",
-        "The temple sings when no one listens.",
-        "Do not trust what you wrote.",
-        "You were warned.",
-        "Cassandra is a curse.",
-        "You already died once.",
-        "The shrines are listening.",
-        "There were more of you. There aren't now."
-    };
-    int index = rand() % hallucinations.size();
-    melasEntries.emplace_back("[HALLUCINATION] " + hallucinations[index]);
+    const int n = static_cast<int>(sizeof(kGenericHallucinations)/sizeof(kGenericHallucinations[0]));
+    int index = std::rand() % n;
+    melasEntries.emplace_back(std::string("[HALLUCINATION] ") + kGenericHallucinations[index]);
+}
+
+void JournalManager::writeCorruptedLine(const std::string& line) {
+    melasEntries.emplace_back(std::string("[HALLUCINATION] ") + line);
+}
+void JournalManager::maybeCorruptOneOnView() {
+    // Only Melas’s journal mutates on view
+    if (showLysaiaJournal) return;
+    if (melasEntries.empty()) return;
+
+    // 50% chance to skip corruption entirely
+    if (std::rand() % 2 != 0) return;
+
+    const int nHall = static_cast<int>(sizeof(kGenericHallucinations) / sizeof(kGenericHallucinations[0]));
+    int numToCorrupt = 1 + (std::rand() % 3); // 1–3 entries
+
+    std::vector<int> chosenIndexes;
+    while ((int)chosenIndexes.size() < numToCorrupt && (int)chosenIndexes.size() < (int)melasEntries.size()) {
+        int idx = std::rand() % static_cast<int>(melasEntries.size());
+        if (std::find(chosenIndexes.begin(), chosenIndexes.end(), idx) == chosenIndexes.end()) {
+            chosenIndexes.push_back(idx);
+        }
+    }
+
+    for (int idx : chosenIndexes) {
+        melasEntries[idx].content = std::string("[HALLUCINATION] ") + kGenericHallucinations[std::rand() % nHall];
+        melasEntries[idx].playerNote.clear();
+    }
+}
+
+
+void JournalManager::printJournal() {
+    // Mutate-on-view behavior (affects only Melas)
+    maybeCorruptOneOnView();
+
+    if (showLysaiaJournal) {
+        if (lysaiaEntries.empty()) {
+            std::cout << "Lysaia's journal is empty.\n";
+        } else {
+            viewLysaia();
+        }
+    } else {
+        if (melasEntries.empty()) {
+            std::cout << "Your journal is empty.\n";
+        } else {
+            viewMelas();
+        }
+    }
+}
+void JournalManager::inspectEntry(int index) const {
+    if (index < 0 || index >= static_cast<int>(melasEntries.size())) {
+        std::cout << "No such entry.\n";
+        return;
+    }
+
+    const auto& entry = melasEntries[index];
+    std::cout << "\n--- Inspecting Entry " << index + 1 << " ---\n";
+    std::cout << entry.content << "\n";
+
+    if (!entry.originalContent.empty()) {
+        std::cout << "[Original Entry]: " << entry.originalContent << "\n";
+    }
+
+    if (!entry.playerNote.empty()) {
+        std::cout << "[Your Note]: " << entry.playerNote << "\n";
+    }
+    std::cout << "---------------------------------\n";
 }
