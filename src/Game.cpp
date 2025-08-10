@@ -366,7 +366,6 @@ if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
      else if (input == "journal") {
         player.printJournal();
          } else if (input.rfind("note ", 0) == 0) {
-         // Syntax: note <entry#> <your text>
             std::istringstream iss(input.substr(5));
              int entryNumber;
              if (!(iss >> entryNumber)) {
