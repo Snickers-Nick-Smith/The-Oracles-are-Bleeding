@@ -329,22 +329,16 @@ void Game::handleCommand(const std::string& input) {
 
     // ===== Movement =====
     static const std::vector<std::string> directions = {
-        "north", "south", "east", "west",
-        "northeast", "northwest", "southeast", "southwest",
-        "up", "down"
-    };
+    "north","south","east","west",
+    "northeast","northwest","southeast","southwest",
+    "up","down"
+};
 
-    if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
-        int currentIndex = player.getCurrentRoom();
-        auto it = roomConnections[currentIndex].find(cmd);
-        if (it != roomConnections[currentIndex].end()) {
-            player.setCurrentRoom(it->second);
-            describeCurrentRoom();
-        } else {
-            std::cout << "You cannot go " << cmd << " from here.\n";
-        }
-        return;
-    }
+if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
+    player.move(cmd, roomConnections);
+    describeCurrentRoom();
+    return;
+}
 
     // ===== Shrine interaction =====
     if (cmd == "shrine") {

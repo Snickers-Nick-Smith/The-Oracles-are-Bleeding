@@ -4,6 +4,7 @@
 #include "JournalManager.hpp"
 #include <vector>
 #include <string>
+#include <iostream>
 
 class Player {
 private:
@@ -18,6 +19,9 @@ public:
     void setCurrentRoom(int index);
     int getSanity() const;
     void loseSanity(int amount);
+   void move(const std::string& direction,
+          const std::unordered_map<int, std::unordered_map<std::string, int>>& roomConnections);
+
 
     // Journal controls
     void writeToJournal(const std::string& entry);

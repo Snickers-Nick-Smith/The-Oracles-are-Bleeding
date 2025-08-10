@@ -1,5 +1,7 @@
 #include "Player.hpp"
-
+#include <iostream>
+#include <unordered_map>
+#include <string>
 // --- Constructor ---
 Player::Player() : currentRoom(0), sanity(100) {}
 
@@ -12,6 +14,23 @@ void Player::loseSanity(int amount) {
     sanity -= amount;
     if (sanity < 0) sanity = 0;
 }
+
+void Player::move(const std::string& direction,
+                  const std::unordered_map<int, std::unordered_map<std::string, int>>& roomConnections)
+{
+    int idx = getCurrentRoom();
+    auto roomIt = roomConnections.find(idx);
+    if (roomIt != roomConnections.end()) {
+        auto dirIt = roomIt->second.find(direction);
+        if (dirIt != roomIt->second.end()) {
+            setCurrentRoom(dirIt->second);
+            std::cout << "You move " << direction << ".\n";
+            return;
+        }
+    }
+    std::cout << "You can't go that way.\n";
+}
+
 
 // --- Journal Integration ---
 void Player::writeToJournal(const std::string& entry) {
