@@ -67,7 +67,6 @@ static std::string toLocationId(const std::string& roomName) {
 }
 
 Game::Game() : isRunning(true) {
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
 }
 
 

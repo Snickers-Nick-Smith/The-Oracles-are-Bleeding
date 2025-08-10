@@ -25,7 +25,7 @@ private:
     void loadRooms();
     void gameLoop();
     void handleCommand(const std::string& input);
-    void displayMainMenu();
+    
     void toggleAccessibility();
     void showMap();
 
@@ -33,6 +33,7 @@ public:
     Game();
     void startLysaiaPlaythrough();
     void lysaiaDay(int day, Shrine& shrine);
+    void displayMainMenu();
     void start();
     void describeCurrentRoom();
 };
