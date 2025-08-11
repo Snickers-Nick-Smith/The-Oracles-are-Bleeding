@@ -16,6 +16,10 @@ ShrineState Shrine::getState() const {
 
 // Getters
 std::string Shrine::getDeityName() const {
+    return deityName; // change to const std::string& if you want to avoid copies
+}
+
+const std::string& Shrine::getName() const noexcept {
     return deityName;
 }
 
@@ -33,13 +37,13 @@ const std::vector<Room>& Shrine::getAssociatedRooms() const {
 
 // Output logic for shrine (basic for now)
 void Shrine::describeShrine() const {
-    std::cout << "Shrine of " << deityName << ": " << shrineRoomName << std::endl;
-    std::cout << "Current state: " << (state == ShrineState::UNCORRUPTED ? "Uncorrupted" : "Corrupted") << std::endl;
-    std::cout << "You feel a presence..." << std::endl;
+    std::cout << "Shrine of " << deityName << ": " << shrineRoomName << '\n';
+    std::cout << "Current state: " << (state == ShrineState::UNCORRUPTED ? "Uncorrupted" : "Corrupted") << '\n';
+    std::cout << "You feel a presence...\n";
 
     std::cout << "\nAssociated rooms:\n";
     for (const Room& r : associatedRooms) {
-        std::cout << "- " << r.getName() << std::endl;
+        std::cout << "- " << r.getName() << '\n';
     }
 }
 
@@ -49,12 +53,9 @@ void Shrine::activate(Player& player) {
 
     if (state == ShrineState::CORRUPTED) {
         std::cout << "The shrine hums with something unnatural.\n";
-        // You can add stat changes or dialogue here
     } else {
         std::cout << "The shrine feels sacred. Familiar. Almost peaceful.\n";
-        // Early game behavior
     }
 
-    // Placeholder interaction
     std::cout << "You kneel. You listen. Nothing answers.\n";
 }

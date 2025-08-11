@@ -1,11 +1,140 @@
 #include "Game.hpp"
 #include "SceneManager.hpp"
 #include "Shrine.hpp"
+#include "utils.hpp"
+#include "Theme.hpp"
+#include <unordered_map>
 #include <iostream>
 #include <algorithm>
 #include <ctime>
 #include <cstdlib>
 #include <sstream>
+
+// --- deity inference helpers -------------------------------------------------
+
+Deity Game::deityFromShrineName(const std::string& name) const {
+    const std::string n = toLower(name);
+    if      (n == "nyx")          return Deity::Nyx;
+    else if (n == "eris")         return Deity::Eris;
+    else if (n == "pan")          return Deity::Pan;
+    else if (n == "demeter")      return Deity::Demeter;
+    else if (n == "persephone")   return Deity::Persephone;
+    else if (n == "false hermes") return Deity::FalseHermes;
+    else if (n == "thanatos")     return Deity::Thanatos;
+    else if (n == "apollo")       return Deity::Apollo;
+    else if (n == "hecate")       return Deity::Hecate;
+    return Deity::Default;
+}
+
+// Map a room name to a deity by known titles you already use.
+// (case-insensitive exact matches; easy to expand)
+Deity Game::deityFromRoomName(const std::string& roomName) const {
+    static const std::unordered_map<std::string, Deity> kRoomToDeity = {
+        // Demeter
+        {"the garden of broken faces", Deity::Demeter},
+        {"the threadbare womb",        Deity::Demeter},
+        {"the hall of hunger",         Deity::Demeter},
+
+        // Nyx
+        {"room with no corners",       Deity::Nyx},
+        {"nest of wings",              Deity::Nyx},
+        {"the starless well",          Deity::Nyx},
+
+        // Apollo
+        {"hall of echoes",             Deity::Apollo},
+        {"room that remembers",        Deity::Apollo},
+        {"echoing gallery",            Deity::Apollo},
+
+        // Hecate
+        {"loom of names",              Deity::Hecate},
+        {"listening chamber",          Deity::Hecate},
+        {"the unlit path",             Deity::Hecate},
+
+        // Persephone
+        {"hall of petals",             Deity::Persephone},
+        {"orchard walk",               Deity::Persephone},
+        {"the frozen spring",          Deity::Persephone},
+
+        // Pan
+        {"hall of shivering meat",     Deity::Pan},
+        {"den of antlers",             Deity::Pan},
+        {"wild rotunda",               Deity::Pan},
+
+        // False Hermes
+        {"room of borrowed things",    Deity::FalseHermes},
+        {"whispering hall",            Deity::FalseHermes},
+        {"gilded hallway",             Deity::FalseHermes},
+
+        // Thanatos
+        {"room of waiting lights",     Deity::Thanatos},
+        {"the room of waiting lights", Deity::Thanatos},
+        {"waiting room",               Deity::Thanatos},
+        {"the waiting room",           Deity::Thanatos},
+        {"sleepwalker’s alcove",       Deity::Thanatos},
+
+        // Eris
+        {"oracle’s wake",              Deity::Eris},
+        {"archivist’s cell",           Deity::Eris},
+        {"throat of the temple",       Deity::Eris},
+        {"the bone choir",             Deity::Eris},
+    };
+
+    const std::string key = toLower(roomName);
+    auto it = kRoomToDeity.find(key);
+    return (it != kRoomToDeity.end()) ? it->second : Deity::Default;
+}
+
+// --- public helpers ----------------------------------------------------------
+
+// Color + (optional) shake for shrine text based on shrine's current state
+void Game::printShrineText(const Shrine& shrine,
+                           const std::string& text,
+                           bool shake,
+                           int intensity,
+                           int durationMs) {
+    const Deity d = deityFromShrineName(shrine.getName());
+    const ShrineState st = shrine.getState(); // UNCORRUPTED/CORRUPTED
+    const std::string styled = ThemeRegistry::style(d, st, text, accessibility_);
+    if (shake) {
+        shakeLine(styled, accessibility_, intensity, durationMs);
+    } else {
+        printWithSpeed(styled, accessibility_, /*endWithNewline*/true);
+    }
+}
+
+// Color a room description line using its deity (if we can infer one).
+void Game::printRoomDescriptionColored(const Room& room,
+                                       const std::string& description) {
+    // If it's a shrine room, prefer the actual shrine's deity & state.
+    if (room.isShrine()) {
+        const int shrineID = room.getShrineID();
+        auto it = shrineRegistry.find(shrineID);
+        if (it != shrineRegistry.end()) {
+            printShrineText(it->second, description, /*shake*/false);
+            return;
+        }
+    }
+
+    // Otherwise try to infer by room name.
+    const Deity d = deityFromRoomName(room.getName());
+    // If we matched a deity, assume the section's shrine state is what you'll use most:
+    // We'll check if there is a known shrine for that deity in shrineRegistry; otherwise default CORRUPTED.
+    ShrineState st = ShrineState::CORRUPTED;
+    for (const auto& kv : shrineRegistry) {
+        if (deityFromShrineName(kv.second.getName()) == d) {
+            st = kv.second.getState();
+            break;
+        }
+    }
+
+    if (d != Deity::Default) {
+        const std::string styled = ThemeRegistry::style(d, st, description, accessibility_);
+        printWithSpeed(styled, accessibility_, true);
+    } else {
+        // Fallback: no deity mapping; print plain
+        printWithSpeed(description, accessibility_, true);
+    }
+}
 
 static std::string toLocationId(const std::string& roomName) {
     // Map ROOM NAMES -> JournalManager location IDs
@@ -319,25 +448,86 @@ void Game::setupConnections() {
     roomConnections[25]["down"] = 0; roomConnections[26]["down"] = 0; roomConnections[27]["down"] = 0; roomConnections[28]["down"] = 0;
 }
 
+namespace {
+    std::string trim_copy(std::string s) {
+        auto not_space = [](int ch){ return !std::isspace(ch); };
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
+        s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
+        return s;
+    }
 
+    // Split into first word (lowercased) and the rest (trimmed, original case kept so notes work)
+    std::pair<std::string,std::string> split_first(const std::string& input) {
+        std::istringstream iss(input);
+        std::string first;
+        iss >> first;
+        std::string rest;
+        std::getline(iss, rest);
+        if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
+        return { toLower(first), trim_copy(rest) };
+    }
 
+    // Normalize direction tokens: supports full, hyphenless, and short forms.
+    // Returns empty string if not a direction.
+    std::string normalize_dir(std::string d) {
+        d = toLower(d);
+        if (d == "n")  return "north";
+        if (d == "s")  return "south";
+        if (d == "e")  return "east";
+        if (d == "w")  return "west";
+        if (d == "ne") return "northeast";
+        if (d == "nw") return "northwest";
+        if (d == "se") return "southeast";
+        if (d == "sw") return "southwest";
+        if (d == "u" || d == "up") return "up";
+        if (d == "d" || d == "down") return "down";
+        // already full word? pass through if valid
+        static const std::vector<std::string> dirs = {
+            "north","south","east","west",
+            "northeast","northwest","southeast","southwest",
+            "up","down"
+        };
+        return (std::find(dirs.begin(), dirs.end(), d) != dirs.end()) ? d : std::string{};
+    }
+
+    bool is_move_verb(const std::string& w) {
+        return w == "go" || w == "move" || w == "walk" || w == "run" || w == "head" || w == "travel";
+    }
+}
 
 
 void Game::handleCommand(const std::string& input) {
-    std::string cmd = toLower(input);
+    const std::string raw = trim_copy(input);
+    if (raw.empty()) { std::cout << "...\n"; return; }
+
+    const auto [first, rest] = split_first(raw);
+    const std::string cmd = toLower(raw); // full lowercased command for single-word checks
 
     // ===== Movement =====
     static const std::vector<std::string> directions = {
-    "north","south","east","west",
-    "northeast","northwest","southeast","southwest",
-    "up","down"
-};
+        "north","south","east","west",
+        "northeast","northwest","southeast","southwest",
+        "up","down"
+    };
 
-if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
-    player.move(cmd, roomConnections);
-    describeCurrentRoom();
-    return;
-}
+    // 2-word verbs like "go north", "move east", "head up"
+    if (is_move_verb(first)) {
+        const std::string dir = normalize_dir(rest);
+        if (!dir.empty()) {
+            player.move(dir, roomConnections);
+            describeCurrentRoom();
+            return;
+        }
+        std::cout << "Go where? (Try: " << join(directions, ", ") << ")\n";
+        return;
+    }
+
+    // One-word directions and short forms: "n", "sw", "up", etc.
+    if (auto dir = normalize_dir(cmd); !dir.empty()) {
+        player.move(dir, roomConnections);
+        describeCurrentRoom();
+        return;
+    }
 
     // ===== Shrine interaction =====
     if (cmd == "shrine") {
@@ -356,48 +546,50 @@ if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
     }
 
     // ===== Look around =====
-    if (cmd == "look") {
+    if (first == "look" || cmd == "look around") {
         describeCurrentRoom();
         return;
     }
 
     // ===== Journal =====
-     else if (input == "journal") {
+    if (cmd == "journal") {
         player.printJournal();
-         } else if (input.rfind("note ", 0) == 0) {
-            std::istringstream iss(input.substr(5));
-             int entryNumber;
-             if (!(iss >> entryNumber)) {
-             std::cout << "Usage: note <entry#> <text>\n";
-          } else {
-            std::string rest;
-            std::getline(iss, rest);
-        if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
-        if (rest.empty()) {
-        std::cout << "Write something after the entry number.\n";
-        } else {
-        player.addJournalNote(entryNumber, rest);
-        std::cout << "Noted.\n";
-    
-    if (input.rfind("inspect ", 0) == 0) {
-    std::istringstream iss(input.substr(8));
-    int entryNumber;
-    if (!(iss >> entryNumber)) {
-        std::cout << "Usage: inspect <entry#>\n";
-    } else {
-        player.inspectJournalEntry(entryNumber - 1); // convert to 0-based
+        return;
     }
-}
-                                                                                                                                  }
-
+    else if (first == "note") {
+        // keep original after 'note ' for free-form text
+        std::istringstream iss(rest);
+        int entryNumber;
+        if (!(iss >> entryNumber)) {
+            std::cout << "Usage: note <entry#> <text>\n";
+            return;
+        }
+        std::string afterNum;
+        std::getline(iss, afterNum);
+        if (!afterNum.empty() && afterNum[0] == ' ') afterNum.erase(0, 1);
+        if (afterNum.empty()) {
+            std::cout << "Write something after the entry number.\n";
+            return;
+        }
+        player.addJournalNote(entryNumber, afterNum);
+        std::cout << "Noted.\n";
+        return;
+    }
+    else if (first == "inspect") {
+        std::istringstream iss(rest);
+        int entryNumber;
+        if (!(iss >> entryNumber)) {
+            std::cout << "Usage: inspect <entry#>\n";
+            return;
+        }
+        player.inspectJournalEntry(entryNumber - 1); // 0-based
+        return;
     }
 
     // ===== Map (only in Main Hall) =====
     if (cmd == "map") {
         if (player.getCurrentRoom() == 0) {
-            TempleMap templeMap;
-            templeMap.populateFromDesign();
-            templeMap.printAscii();
+            showMap();
         } else {
             std::cout << "You can only consult the map from the Main Hall.\n";
         }
@@ -407,16 +599,21 @@ if (std::find(directions.begin(), directions.end(), cmd) != directions.end()) {
     // ===== Help =====
     if (cmd == "help") {
         std::cout << "Commands:\n"
-                  << "  Movement: " << join(directions, ", ") << "\n"
-                  << "  look - reprint current room description\n"
-                  << "  shrine - interact with shrine (if present)\n"
-                  << "  journal - view your journal entries\n"
-                  << "  map - view temple map (Main Hall only)\n"
-                  << "  help - show this help menu\n";
+                  << "  Movement: " << join(directions, ", ") << " (also: n, s, e, w, ne, nw, se, sw, u, d)\n"
+                  << "            go/move/walk/run/head/travel <direction>\n"
+                  << "  look / look around\n"
+                  << "  shrine\n"
+                  << "  journal\n"
+                  << "  note <entry#> <text>\n"
+                  << "  inspect <entry#>\n"
+                  << "  map (Main Hall only)\n"
+                  << "  help\n";
         return;
     }
 
+    // ===== Unknown =====
     std::cout << "Unknown command. Type 'help' for a list of commands.\n";
 }
+
 
 

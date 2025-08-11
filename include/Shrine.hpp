@@ -21,9 +21,12 @@ private:
 public:
     Shrine(const std::string& deity, const std::string& shrineRoom);
 
-    void setState(ShrineState newState);
+    // Getters
+    const std::string& getName() const noexcept;           // deity name
     ShrineState getState() const;
+    void setState(ShrineState newState);
 
+    // If you prefer no copies, you can switch this to const std::string& too.
     std::string getDeityName() const;
     std::string getShrineRoomName() const;
 
@@ -33,7 +36,7 @@ public:
     void describeShrine() const;
     void activate(Player& player); // dynamic interaction
 
-    static void activateByID(int shrineID, Player& player); // optional legacy static method
+    static void activateByID(int shrineID, Player& player); // (declare only if you plan to define it)
 };
 
 #endif
