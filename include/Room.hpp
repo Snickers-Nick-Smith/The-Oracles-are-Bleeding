@@ -15,7 +15,6 @@ private:
 
 public:
     Room(const std::string& n, const std::string& d, bool shrine = false, int id = -1);
-
     std::string getName() const;
     std::string getDescription() const;
     bool shrinePresent() const;

@@ -46,6 +46,8 @@ public:
     // -----------------------------
     // Lysaia journal (read-only)
     // -----------------------------
+    void seedLysaiaPrologueText();                    // preload shrine + guilt texts
+    void writeLysaiaGuiltBeat(int day);               // optional day-specific guilt beat
     void writeLysaia(const std::string& entry);          // free-form append
     void writeLysaiaAt(const std::string& locationID);   // from registry
     void viewLysaia() const;

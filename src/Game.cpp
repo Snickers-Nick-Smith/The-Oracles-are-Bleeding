@@ -3,10 +3,12 @@
 #include "Shrine.hpp"
 #include "utils.hpp"
 #include "Theme.hpp"
+#include "prologueController.hpp" 
 #include <unordered_map>
 #include <iostream>
 #include <algorithm>
 #include <ctime>
+#include <cctype>
 #include <cstdlib>
 #include <sstream>
 
@@ -30,53 +32,67 @@ Deity Game::deityFromShrineName(const std::string& name) const {
 // (case-insensitive exact matches; easy to expand)
 Deity Game::deityFromRoomName(const std::string& roomName) const {
     static const std::unordered_map<std::string, Deity> kRoomToDeity = {
-        // Demeter
-        {"the garden of broken faces", Deity::Demeter},
+        // ===== Demeter =====
+        {"the garden of broken faces", Deity::Demeter},   // corrupted
         {"the threadbare womb",        Deity::Demeter},
         {"the hall of hunger",         Deity::Demeter},
+        {"garden of blooming faces",   Deity::Demeter},   // uncorrupted
+        {"threaded womb",              Deity::Demeter},
+        {"hall of plenty",             Deity::Demeter},
 
-        // Nyx
-        {"room with no corners",       Deity::Nyx},
+        // ===== Nyx =====
+        {"room with no corners",       Deity::Nyx},       // corrupted
         {"nest of wings",              Deity::Nyx},
         {"the starless well",          Deity::Nyx},
+        {"room of gentle horizons",    Deity::Nyx},       // uncorrupted
+        {"the star-bound well",        Deity::Nyx},
 
-        // Apollo
+        // ===== Apollo =====  (same across both states)
         {"hall of echoes",             Deity::Apollo},
         {"room that remembers",        Deity::Apollo},
         {"echoing gallery",            Deity::Apollo},
 
-        // Hecate
+        // ===== Hecate =====
         {"loom of names",              Deity::Hecate},
         {"listening chamber",          Deity::Hecate},
-        {"the unlit path",             Deity::Hecate},
+        {"the unlit path",             Deity::Hecate},    // corrupted
+        {"the luminous path",          Deity::Hecate},    // uncorrupted
 
-        // Persephone
+        // ===== Persephone =====
         {"hall of petals",             Deity::Persephone},
         {"orchard walk",               Deity::Persephone},
-        {"the frozen spring",          Deity::Persephone},
+        {"the frozen spring",          Deity::Persephone},// corrupted
+        {"the blooming spring",        Deity::Persephone},// uncorrupted
 
-        // Pan
-        {"hall of shivering meat",     Deity::Pan},
+        // ===== Pan =====
+        {"hall of shivering meat",     Deity::Pan},       // corrupted
         {"den of antlers",             Deity::Pan},
         {"wild rotunda",               Deity::Pan},
+        {"hall of living wood",        Deity::Pan},       // uncorrupted
+        {"verdant rotunda",            Deity::Pan},
 
-        // False Hermes
+        // ===== False Hermes ===== (same titles)
         {"room of borrowed things",    Deity::FalseHermes},
         {"whispering hall",            Deity::FalseHermes},
         {"gilded hallway",             Deity::FalseHermes},
 
-        // Thanatos
+        // ===== Thanatos =====
         {"room of waiting lights",     Deity::Thanatos},
         {"the room of waiting lights", Deity::Thanatos},
         {"waiting room",               Deity::Thanatos},
         {"the waiting room",           Deity::Thanatos},
-        {"sleepwalker’s alcove",       Deity::Thanatos},
+        {"sleepwalker’s alcove",       Deity::Thanatos},  // corrupted shrine
+        {"hall of quiet rest",         Deity::Thanatos},  // uncorrupted shrine
 
-        // Eris
+        // ===== Eris =====
         {"oracle’s wake",              Deity::Eris},
         {"archivist’s cell",           Deity::Eris},
         {"throat of the temple",       Deity::Eris},
-        {"the bone choir",             Deity::Eris},
+        {"the bone choir",             Deity::Eris},      // corrupted shrine
+        {"hall of harmony",            Deity::Eris},      // uncorrupted shrine
+
+        // ===== Hub =====
+        {"main hall of the temple",    Deity::Default}
     };
 
     const std::string key = toLower(roomName);
@@ -137,125 +153,329 @@ void Game::printRoomDescriptionColored(const Room& room,
 }
 
 static std::string toLocationId(const std::string& roomName) {
-    // Map ROOM NAMES -> JournalManager location IDs
     static const std::unordered_map<std::string, std::string> kRoomToLocId = {
-        // Demeter
+        // ===== Demeter =====
         {"The Garden of Broken Faces", "demeter/room/garden_of_broken_faces"},
         {"The Threadbare Womb",       "demeter/room/threadbare_womb"},
         {"The Hall of Hunger",        "demeter/shrine"},
+        {"Garden of Blooming Faces",  "demeter/room/garden_of_blooming_faces"}, // new
+        {"Threaded Womb",             "demeter/room/threaded_womb"},            // new
+        {"Hall of Plenty",            "demeter/shrine_uncorrupted"},            // new (use your preferred id)
 
-        // Nyx
+        // ===== Nyx =====
         {"Room With No Corners",      "nyx/room/no_corners"},
         {"Nest of Wings",             "nyx/room/nest_of_wings"},
         {"The Starless Well",         "nyx/shrine"},
+        {"Room of Gentle Horizons",   "nyx/room/gentle_horizons"},              // new
+        {"The Star-Bound Well",       "nyx/shrine_uncorrupted"},                // new
 
-        // Apollo
+        // ===== Apollo =====
         {"Hall of Echoes",            "apollo/room/hall_of_echoes"},
         {"Room That Remembers",       "apollo/room/room_that_remembers"},
         {"Echoing Gallery",           "apollo/shrine"},
 
-        // Hecate
+        // ===== Hecate =====
         {"Loom of Names",             "hecate/room/loom_of_names"},
         {"Listening Chamber",         "hecate/room/listening_chamber"},
         {"The Unlit Path",            "hecate/shrine"},
+        {"The Luminous Path",         "hecate/shrine_uncorrupted"},             // new
 
-        // Persephone (updated names)
+        // ===== Persephone =====
         {"Hall of Petals",            "persephone/room/hall_of_petals"},
         {"Orchard Walk",              "persephone/room/orchard_walk"},
         {"The Frozen Spring",         "persephone/shrine"},
+        {"The Blooming Spring",       "persephone/shrine_uncorrupted"},         // new
 
-        // Pan
+        // ===== Pan =====
         {"Hall of Shivering Meat",    "pan/room/hall_of_shivering_meat"},
         {"Den of Antlers",            "pan/room/den_of_antlers"},
         {"Wild Rotunda",              "pan/shrine"},
+        {"Hall of Living Wood",       "pan/room/hall_of_living_wood"},          // new
+        {"Verdant Rotunda",           "pan/shrine_uncorrupted"},                // new
 
-        // False Hermes
+        // ===== False Hermes =====
         {"Room of Borrowed Things",   "false_hermes/room/borrowed_things"},
         {"Whispering Hall",           "false_hermes/room/whispering_hall"},
         {"Gilded Hallway",            "false_hermes/shrine"},
 
-        // Thanatos (updated names, accept both)
+        // ===== Thanatos =====
         {"Room of Waiting Lights",    "thanatos/room/room_of_waiting_lights"},
         {"The Room of Waiting Lights","thanatos/room/room_of_waiting_lights"},
         {"Waiting Room",              "thanatos/room/waiting_room"},
         {"The Waiting Room",          "thanatos/room/waiting_room"},
         {"Sleepwalker’s Alcove",      "thanatos/shrine"},
+        {"Hall of Quiet Rest",        "thanatos/shrine_uncorrupted"},           // new
 
-        // Eris
+        // ===== Eris =====
         {"Oracle’s Wake",             "eris/room/oracles_wake"},
         {"Archivist’s Cell",          "eris/room/archivists_cell"},
         {"Throat of the Temple",      "eris/room/throat_of_temple"},
         {"The Bone Choir",            "eris/shrine"},
+        {"Hall of Harmony",           "eris/shrine_uncorrupted"},               // new
 
-        // Hub
-        {"Main Hall of the Temple",   ""} // No journal entry for hub (by design)
+        // ===== Hub =====
+        {"Main Hall of the Temple",   ""}
     };
 
     auto it = kRoomToLocId.find(roomName);
     return (it != kRoomToLocId.end()) ? it->second : std::string{};
 }
 
+// Room Descriptor
+void Game::describeCurrentRoom() {
+    const int id = player.getCurrentRoom();
+    const Room& current = rooms[id];
+
+    // Color the room description based on deity
+    printRoomDescriptionColored(current, current.getDescription());
+
+    // (Optional) list visible exits
+    auto it = roomConnections.find(id);
+    if (it != roomConnections.end() && !it->second.empty()) {
+        std::vector<std::string> exits;
+        exits.reserve(it->second.size());
+        for (const auto& kv : it->second) exits.push_back(kv.first);
+        std::sort(exits.begin(), exits.end());
+        std::cout << "Exits: " << join(exits, ", ") << "\n";
+    }
+}
+
+void Game::runLysaiaPrologue() {
+    PrologueController::Hooks hooks;
+
+    hooks.describe = [this]() { describeCurrentRoom(); };
+
+    hooks.listExits = [this]() {
+        const int cur = player.getCurrentRoom();
+        auto it = roomConnections.find(cur);
+        if (it == roomConnections.end() || it->second.empty()) {
+            std::cout << "No obvious exits.\n";
+            return;
+        }
+        std::vector<std::string> dirs;
+        dirs.reserve(it->second.size());
+        for (const auto& kv : it->second) dirs.push_back(kv.first);
+        std::sort(dirs.begin(), dirs.end());
+        std::cout << "Exits: " << join(dirs, ", ") << "\n";
+    };
+
+    hooks.moveTo = [this](const std::string& target) -> bool {
+        // Try direction first (supports n, sw, up, etc.) using your normalize_dir()
+        if (auto dir = normalize_dir(target); !dir.empty()) {
+            player.move(dir, roomConnections);
+            describeCurrentRoom();
+            return true;
+        }
+        // Try room title among visible neighbors
+        const int cur = player.getCurrentRoom();
+        auto it = roomConnections.find(cur);
+        if (it == roomConnections.end()) { std::cout << "You can’t move from here.\n"; return false; }
+
+        const std::string t = toLower(target);
+        for (const auto& kv : it->second) {
+            int idx = kv.second;
+            if (toLower(rooms[idx].getName()) == t) {
+                player.setCurrentRoom(idx);
+                std::cout << "You move to: " << rooms[idx].getName() << "\n";
+                describeCurrentRoom();
+                return true;
+            }
+        }
+        std::cout << "No path to '" << target << "'. Try 'exits'.\n";
+        return false;
+    };
+
+hooks.writeJournal = [this](int day) {
+    const int cur = player.getCurrentRoom();
+    const Room& r = rooms[cur];
+
+    // 1) Room-specific entry (if mapped)
+    const std::string loc = toLocationId(r.getName());
+    if (!loc.empty()) {
+        journalManager.writeLysaiaAt(loc);
+    } else {
+        journalManager.writeLysaia("I wrote in an unmarked place, to keep it from becoming strange.");
+    }
+
+    // 2) Shrine attempt entry — first time only, if this room is a shrine
+    if (r.isShrine() && !lysaiaShrinesLogged_.count(cur)) {
+        // prefer uncorrupted shrine location id if available; fall back to generic shrine id
+        std::string shrineKey = loc;
+        if (shrineKey.empty()) {
+            // Derive by deity if needed (matches IDs we seeded)
+            const Deity d = deityFromRoomName(r.getName());
+            switch (d) {
+                case Deity::Demeter:    shrineKey = "demeter/shrine_uncorrupted"; break;
+                case Deity::Nyx:        shrineKey = "nyx/shrine_uncorrupted"; break;
+                case Deity::Apollo:     shrineKey = "apollo/shrine"; break;
+                case Deity::Hecate:     shrineKey = "hecate/shrine_uncorrupted"; break;
+                case Deity::Persephone: shrineKey = "persephone/shrine_uncorrupted"; break;
+                case Deity::Pan:        shrineKey = "pan/shrine_uncorrupted"; break;
+                case Deity::FalseHermes:shrineKey = "false_hermes/shrine"; break;
+                case Deity::Thanatos:   shrineKey = "thanatos/shrine_uncorrupted"; break;
+                case Deity::Eris:       shrineKey = "eris/shrine_uncorrupted"; break;
+                default: break;
+            }
+        }
+        if (!shrineKey.empty()) {
+            journalManager.writeLysaiaAt(shrineKey);
+        }
+        lysaiaShrinesLogged_.insert(cur);
+    }
+
+    // 3) Day-specific guilt beat
+    journalManager.writeLysaiaGuiltBeat(day);
+
+    std::cout << "You light the candle and write. The ink dries in steady lines.\n";
+};
+
+    hooks.promptPrefix = [this]() -> std::string {
+    std::ostringstream oss;
+    oss << "[" << rooms[player.getCurrentRoom()].getName() << "] > ";
+    return oss.str();
+};
+
+
+
+    PrologueController prologue(hooks);
+    prologue.run();
+
+    // Dump to main menu when done
+    displayMainMenu();
+}
+
 Game::Game() : isRunning(true) {
 }
 
 
-void Game::startLysaiaPlaythrough() {
-    std::vector<Shrine> shrines;
+void Game::startLysaiaPrologue() {
+    rooms.clear();
+    shrineRegistry.clear();
+    roomConnections.clear();
 
-    // Day 1 – Demeter
-    Shrine demeter("Demeter", "Hall of Hunger");
+    // ===== Main Hall =====
+    rooms.push_back(Room(
+        "Main Hall of the Temple",
+        "Sunlight streams through high windows, casting bright patterns across polished marble. The air is warm, "
+        "and the faint sound of lyres drifts from unseen corridors."
+    ));
+    player.setCurrentRoom(0);
+
+    // ===== Demeter =====
+    Shrine demeter("Demeter", "Hall of Plenty");
     demeter.setState(ShrineState::UNCORRUPTED);
-    demeter.addAssociatedRoom(Room("Garden of Broken Faces", "Masks litter the overgrown path—some smiling, some cracked in despair. A vine-covered mirror stands at the center, reflecting only strangers."));
-    demeter.addAssociatedRoom(Room("Threadbare Womb", "The walls are made of fibrous, pulsing material—almost alive. A faint heartbeat hums under your feet. An empty cradle sits in the center, rocking gently though no one is near."));
-    shrines.push_back(demeter);
+    shrineRegistry[0] = demeter;
+    rooms.push_back(Room("Garden of Blooming Faces",
+        "A peaceful garden of carved masks, each smiling serenely. Ivy and flowers weave gently between them, "
+        "and the air is heavy with the scent of ripe fruit."));
+    rooms.push_back(Room("Threaded Womb",
+        "Soft woven cloth drapes the walls, dyed in warm golds and greens. In the center rests a cradle, "
+        "adorned with fresh flowers and resting quietly."));
+    rooms.push_back(Room("Hall of Plenty",
+        "Rows of tables are laden with bread, grain, and ripe fruit. The distant hum of bees echoes softly.", true, 0));
 
-    // Day 2 – Nyx
-    Shrine nyx("Nyx", "Starless Well");
+    // ===== Nyx =====
+    Shrine nyx("Nyx", "The Star-Bound Well");
     nyx.setState(ShrineState::UNCORRUPTED);
-    nyx.addAssociatedRoom(Room("Room With No Corners", "The walls curve softly into one another. There are no shadows, no edges. You always feel like you’re at the center—even when walking. Something breathes in rhythm with you."));
-    nyx.addAssociatedRoom(Room("Nest of Wings", "The ceiling is unseen. Black feathers drift downward. A nest of glass bones sits abandoned. You’re certain you heard wings—but only once."));
-    shrines.push_back(nyx);
+    shrineRegistry[1] = nyx;
+    rooms.push_back(Room("Room of Gentle Horizons",
+        "The walls curve seamlessly into floor and ceiling. A faint, soft starlight fills the air, "
+        "as though the sky itself has come inside."));
+    rooms.push_back(Room("Nest of Wings",
+        "Feathers drift lazily from above, white and clean. In the center, a nest woven of pale reeds rests, "
+        "warm from the touch of something unseen."));
+    rooms.push_back(Room("The Star-Bound Well",
+        "A perfectly round well reflects the stars, even in daylight. The water is still, yet seems impossibly deep.", true, 1));
 
-    // Day 3 – Apollo
+    // ===== Apollo =====
     Shrine apollo("Apollo", "Echoing Gallery");
     apollo.setState(ShrineState::UNCORRUPTED);
-    apollo.addAssociatedRoom(Room("Hall of Echoes", "Every step you take repeats a second later—just slightly out of sync. A chorus murmurs words you almost recognize. If you speak, something replies from behind."));
-    apollo.addAssociatedRoom(Room("Room That Remembers", "Every surface is mirrored, but you’re never alone. Sometimes your reflection lags. Sometimes it moves first. Sometimes it’s gone entirely—but you still feel watched."));
-    shrines.push_back(apollo);
+    shrineRegistry[2] = apollo;
+    rooms.push_back(Room("Hall of Echoes",
+        "Marble columns sing softly when touched by the wind. Every sound here returns as music, "
+        "layered and harmonious."));
+    rooms.push_back(Room("Room That Remembers",
+        "Polished stone reflects your image clearly. When you move, your reflection follows perfectly, "
+        "and the air smells faintly of cedar and sunlight."));
+    rooms.push_back(Room("Echoing Gallery",
+        "A long hallway of golden mosaics, each panel telling a story in vibrant color. "
+        "A warm breeze stirs the air.", true, 2));
 
-    // Day 4 – Hecate
-    Shrine hecate("Hecate", "The Unlit Path");
+    // ===== Hecate =====
+    Shrine hecate("Hecate", "The Luminous Path");
     hecate.setState(ShrineState::UNCORRUPTED);
-    hecate.addAssociatedRoom(Room("Loom of Names", "Threads hang like veins, each labeled in ink. One bears your name. Another is frayed. The loom creaks but never stops. Something is weaving nearby, just out of sight."));
-    hecate.addAssociatedRoom(Room("Listening Chamber", "Shells line the walls, hung like ears. Some whisper forgotten hymns. Others sob. When you breathe, a shell beside you repeats it a beat too late."));
-    shrines.push_back(hecate);
+    shrineRegistry[3] = hecate;
+    rooms.push_back(Room("Loom of Names",
+        "Threads of silk stretch across a great frame, each glowing faintly. The sound of weaving is calm and steady."));
+    rooms.push_back(Room("Listening Chamber",
+        "Shells line the walls, carrying the sound of the sea. When you speak, the shells sing your words back in harmony."));
+    rooms.push_back(Room("The Luminous Path",
+        "Lanterns guide the way forward, their flames steady. The path is straight, and the air feels safe.", true, 3));
 
-    // Day 5 – False Hermes
-    Shrine hermes("False Hermes", "Gilded Hallway");
-    hermes.setState(ShrineState::UNCORRUPTED);
-    hermes.addAssociatedRoom(Room("Room of Borrowed Things", "Shelves display small, mundane objects—combs, rings, sandals, letters. Each is labeled with a name you don’t recognize. One item is missing, but its tag reads your name. A drawer creaks open behind you."));
-    hermes.addAssociatedRoom(Room("Whispering Hall", "Words are etched into every surface. None are repeated. The longer you stare, the more familiar the languages seem—until you find your own handwriting, carved deep and frantic."));
-    shrines.push_back(hermes);
+    // ===== Persephone =====
+    Shrine persephone("Persephone", "The Blooming Spring");
+    persephone.setState(ShrineState::UNCORRUPTED);
+    shrineRegistry[4] = persephone;
+    rooms.push_back(Room("Hall of Petals",
+        "Petals drift down from unseen branches, gathering softly on the floor. Their fragrance is sweet and light."));
+    rooms.push_back(Room("Orchard Walk",
+        "Rows of fruit trees stand heavy with blossoms, their branches gently swaying in a warm breeze."));
+    rooms.push_back(Room("The Blooming Spring",
+        "A clear spring flows gently, surrounded by flowers in full bloom. The air hums with bees and distant laughter.", true, 4));
 
-    // Day 6 – Pan
-    Shrine pan("Pan", "Wild Rotunda");
+    // ===== Pan =====
+    Shrine pan("Pan", "Verdant Rotunda");
     pan.setState(ShrineState::UNCORRUPTED);
-    pan.addAssociatedRoom(Room("Hall of Shivering Meat", "Walls pulse with veins beneath translucent skin. Occasionally, a muscle twitches in the stone. A single pan flute lies on the ground—when touched, it plays a bleating cry."));
-    pan.addAssociatedRoom(Room("Den of Antlers", "Bones and antlers are fused into the architecture. The floor is covered in fur—not all of it animal. Something stalks just out of view, its gait rhythmic, almost... joyful."));
-    shrines.push_back(pan);
+    shrineRegistry[5] = pan;
+    rooms.push_back(Room("Hall of Living Wood",
+        "The walls are carved from living trees, their leaves whispering overhead. The smell of earth and moss is fresh and clean."));
+    rooms.push_back(Room("Den of Antlers",
+        "Antlers adorn the walls, polished and unbroken. The floor is covered in soft ferns, and somewhere, a flute plays."));
+    rooms.push_back(Room("Verdant Rotunda",
+        "A round chamber open to the sky, where ivy climbs the stone walls and birds nest in the beams.", true, 5));
 
-    // Day 7 – Eris
-    Shrine eris("Eris", "Bone Choir");
+    // ===== False Hermes =====
+    Shrine falseHermes("False Hermes", "Gilded Hallway");
+    falseHermes.setState(ShrineState::UNCORRUPTED);
+    shrineRegistry[6] = falseHermes;
+    rooms.push_back(Room("Room of Borrowed Things",
+        "Neatly arranged items rest on shelves, each labeled with care. A faint smell of parchment fills the air."));
+    rooms.push_back(Room("Whispering Hall",
+        "Words are etched in flowing script across the walls, each telling a gentle tale. The sound of quills scratching is faintly heard."));
+    rooms.push_back(Room("Gilded Hallway",
+        "Golden panels reflect your image in warm light. The floor is swept clean, and the air smells of incense.", true, 6));
+
+    // ===== Thanatos =====
+    Shrine thanatos("Thanatos", "Hall of Quiet Rest");
+    thanatos.setState(ShrineState::UNCORRUPTED);
+    shrineRegistry[7] = thanatos;
+    rooms.push_back(Room("Room of Waiting Lights",
+        "Lanterns hang in still air, each burning steadily. The silence here is peaceful and complete."));
+    rooms.push_back(Room("The Waiting Room",
+        "Cushioned benches face a great window where clouds drift by slowly. A pot of tea sits untouched on a table."));
+    rooms.push_back(Room("Hall of Quiet Rest",
+        "Tall doors open onto a calm garden where no wind stirs. The only sound is the quiet hum of the earth.", true, 7));
+
+    // ===== Eris =====
+    Shrine eris("Eris", "Hall of Harmony");
     eris.setState(ShrineState::UNCORRUPTED);
-    eris.addAssociatedRoom(Room("Throat of the Temple", "The corridor narrows slowly behind you. The walls are damp and warm to the touch. You hear a low, slow heartbeat. Every step echoes like a swallowed breath."));
-    eris.addAssociatedRoom(Room("Oracle’s Wake", "Candles flicker in defiance of windless dark. A defaced altar bleeds wax. Someone scratched “I won’t lie again” into the stone 27 times."));
-    eris.addAssociatedRoom(Room("Archivist’s Cell", "A rusted desk faces the wall. Dozens of inked notes are nailed above it—each crossed out violently. Scratched into the desk: “It was true. That’s the problem.” The chair is still warm."));
-    shrines.push_back(eris);
-    
+    shrineRegistry[8] = eris;
+    rooms.push_back(Room("Throat of the Temple",
+        "A wide, bright corridor where banners sway gently. Sunlight spills in through high arches."));
+    rooms.push_back(Room("Oracle’s Wake",
+        "A polished altar draped in white cloth. Candles burn steadily, their wax dripping slowly onto silver trays."));
+    rooms.push_back(Room("Archivist’s Cell",
+        "A tidy desk stacked with neatly bound books. The air smells of ink and lavender, and a quill rests in an open journal."));
+    rooms.push_back(Room("Hall of Harmony",
+        "A vaulted chamber filled with soft music and the glow of stained glass. Dust motes drift in the warm light.", true, 8));
 
-    std::cout << "\nNo more candlelight. No more writing. The Bone Choir waits.\n";
-    isRunning = false;
+    setupConnections();
+    runLysaiaPrologue();
+    lysaiaShrinesLogged_.clear();
+    journalManager.seedLysaiaPrologueText();
+    runLysaiaPrologue();
 }
+
 
 void Game::displayMainMenu() {
     int choice;
@@ -547,9 +767,8 @@ void Game::handleCommand(const std::string& input) {
 
     // ===== Look around =====
     if (first == "look" || cmd == "look around") {
-        describeCurrentRoom();
-        return;
-    }
+       describeCurrentRoom();}
+
 
     // ===== Journal =====
     if (cmd == "journal") {
