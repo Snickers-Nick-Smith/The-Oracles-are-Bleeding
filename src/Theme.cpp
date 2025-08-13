@@ -43,6 +43,7 @@ static const Theme& panTheme() {
         ansi("\x1b[38;5;70m"),
         ansi("\x1b[38;5;106m"),
         "", "",
+        "", ""
     };
     return t;
 }
@@ -86,7 +87,8 @@ static const Theme& thanatosTheme() {
         ansi("\x1b[38;5;240m"), // davys_gray
         ansi("\x1b[38;5;236m"), // dark charcoal
         ansi("\x1b[48;5;69m"),  // bg Uncorrupted: blueberry 
-        ansi("\x1b[48;5;105m")  // bg Corrupted: violets_are_blue 
+        ansi("\x1b[48;5;105m"),  // bg Corrupted: violets_are_blue 
+        "", ""
     };
     return t;
 }
@@ -172,6 +174,33 @@ ShrineState ThemeRegistry::getDefaultShrineState() {
 ShrineState& ThemeRegistry::defaultStateRef() {
     static ShrineState s = ShrineState::UNCORRUPTED;
     return s;
+}
+
+std::string ThemeRegistry::style(Deity d,
+                                 ShrineState state,
+                                 std::string_view text,
+                                 const AccessibilitySettings& as) {
+    if (!as.colorEnabled || !ansiCapable()) {
+        return std::string(text);
+    }
+
+    const Theme& th = get(d);
+    const std::string& fg   = (state == ShrineState::UNCORRUPTED) ? th.fgUNCORRUPTED   : th.fgCORRUPTED;
+    const std::string& bg   = (state == ShrineState::UNCORRUPTED) ? th.bgUNCORRUPTED   : th.bgCORRUPTED;
+    const std::string& attr = (state == ShrineState::UNCORRUPTED) ? th.attrUNCORRUPTED : th.attrCORRUPTED;
+
+    if (fg.empty() && bg.empty() && attr.empty()) {
+        return std::string(text);
+    }
+
+    std::string out;
+    out.reserve(attr.size() + fg.size() + bg.size() + text.size() + 4);
+    if (!attr.empty()) out.append(attr);
+    if (!fg.empty())   out.append(fg);
+    if (!bg.empty())   out.append(bg);
+    out.append(text);
+    out.append(reset()); // reset() -> "" if ANSI not supported
+    return out;
 }
 
 // Convenience printer: wraps style() + typewriter + optional shake

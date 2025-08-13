@@ -15,11 +15,13 @@ struct JournalEntry {
         : content(c), playerNote(note) {}
 };
 
-// Location-bound text the game knows about ahead of time
 struct EntryData {
-    std::string actual;         // The true/canonical entry for this location
-    std::string hallucination;  // The paired hallucination text for this location
+    std::string actual;
+    std::string hallucination{};
 };
+
+
+
 
 class JournalManager {
 private:

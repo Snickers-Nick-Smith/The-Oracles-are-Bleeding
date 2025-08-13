@@ -16,6 +16,7 @@ private:
     std::vector<Room> associatedRooms;
 
 public:
+Shrine() = default;
     Shrine(const std::string& deity, const std::string& shrineRoom);
 
     // Getters / setters

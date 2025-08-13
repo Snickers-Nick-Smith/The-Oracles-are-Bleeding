@@ -68,6 +68,9 @@ public:
                                bool shake = false,
                                int intensity = 2,
                                int durationMs = 200);
+                               
+    static std::string style(Deity, ShrineState, std::string_view, const AccessibilitySettings&);
+
 private:
     static ShrineState& defaultStateRef();
 };

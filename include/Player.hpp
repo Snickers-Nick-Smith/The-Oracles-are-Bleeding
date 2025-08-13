@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <unordered_map>
 
 class Player {
 private:
@@ -19,9 +20,9 @@ public:
     void setCurrentRoom(int index);
     int getSanity() const;
     void loseSanity(int amount);
-   void move(const std::string& direction,
-          const std::unordered_map<int, std::unordered_map<std::string, int>>& roomConnections);
 
+    void move(const std::string& direction,
+              const std::unordered_map<int, std::unordered_map<std::string, int>>& roomConnections);
 
     // Journal controls
     void writeToJournal(const std::string& entry);
@@ -33,8 +34,6 @@ public:
     void addJournalNote(int entryIndexOneBased, const std::string& note);
     void printJournal();
     void inspectJournalEntry(int index) const { journal.inspectEntry(index); }
-
-
 };
 
-#endif
+#endif // PLAYER_HPP

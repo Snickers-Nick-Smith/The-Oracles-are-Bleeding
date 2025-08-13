@@ -53,28 +53,28 @@ static const char* kGenericHallucinations[] = {
 // -----------------------------
 // Definitions / Registry
 // -----------------------------
-
 void JournalManager::seedLysaiaPrologueText() {
-    // Shrine attempts (uncorrupted). Keys match your toLocationId naming scheme.
-    locationEntries["demeter/shrine_uncorrupted"]     = {"I brought offerings to Demeter and spoke plainly: feed what I starved. The grain did not bow. I bowed instead."};
-    locationEntries["nyx/shrine_uncorrupted"]         = {"At Nyx’s well I whispered my fear into the still water. The stars under the surface did not answer—perhaps they were listening."};
-    locationEntries["apollo/shrine"]                  = {"In Apollo’s gallery my voice doubled back as song. I asked for truth. The echo repeated only what I already knew."};
-    locationEntries["hecate/shrine_uncorrupted"]      = {"At the Luminous Path I asked for a door that opens only forward. The lanterns did not argue. I did."};
-    locationEntries["persephone/shrine_uncorrupted"]  = {"I asked Persephone how to hold two seasons at once. She remained kind, and silent."};
-    locationEntries["pan/shrine_uncorrupted"]         = {"I tried to speak softly to the earth. The earth spoke softly back, as if it pitied me."};
-    locationEntries["false_hermes/shrine"]            = {"I greeted the messenger who isn’t. He smiled without teeth. I smiled with mine and said nothing else."};
-    locationEntries["thanatos/shrine_uncorrupted"]    = {"I asked Thanatos if forgetting can be merciful. He made no promises, which felt like one."};
-    locationEntries["eris/shrine_uncorrupted"]        = {"I told Eris I would not play. She called that a move. I pretended not to hear the rules."};
+    // Shrine attempts (uncorrupted)
+    locationEntries["demeter/shrine_uncorrupted"]     = {"I brought offerings to Demeter and spoke plainly: feed what I starved. The grain did not bow. I bowed instead.", ""};
+    locationEntries["nyx/shrine_uncorrupted"]         = {"At Nyx’s well I whispered my fear into the still water. The stars under the surface did not answer—perhaps they were listening.", ""};
+    locationEntries["apollo/shrine"]                  = {"In Apollo’s gallery my voice doubled back as song. I asked for truth. The echo repeated only what I already knew.", ""};
+    locationEntries["hecate/shrine_uncorrupted"]      = {"At the Luminous Path I asked for a door that opens only forward. The lanterns did not argue. I did.", ""};
+    locationEntries["persephone/shrine_uncorrupted"]  = {"I asked Persephone how to hold two seasons at once. She remained kind, and silent.", ""};
+    locationEntries["pan/shrine_uncorrupted"]         = {"I tried to speak softly to the earth. The earth spoke softly back, as if it pitied me.", ""};
+    locationEntries["false_hermes/shrine"]            = {"I greeted the messenger who isn’t. He smiled without teeth. I smiled with mine and said nothing else.", ""};
+    locationEntries["thanatos/shrine_uncorrupted"]    = {"I asked Thanatos if forgetting can be merciful. He made no promises, which felt like one.", ""};
+    locationEntries["eris/shrine_uncorrupted"]        = {"I told Eris I would not play. She called that a move. I pretended not to hear the rules.", ""};
 
-    // Guilt beats — referenced by day using writeLysaiaGuiltBeat(day)
-    locationEntries["meta/guilt/day1"] = {"I wrote her new name to keep her safe. Names travel faster than truth."};
-    locationEntries["meta/guilt/day2"] = {"Cassandra was a kindness I could live with. Melas was a child I could not lose."};
-    locationEntries["meta/guilt/day3"] = {"Exile was supposed to be distance, not a sentence. I told myself the temple would quiet down."};
-    locationEntries["meta/guilt/day4"] = {"When the others turned against her, they were following me. I keep walking."};
-    locationEntries["meta/guilt/day5"] = {"If she returns, she will use the name I gave her. I have made a stranger whose face I know."};
-    locationEntries["meta/guilt/day6"] = {"If I confess, Eris will clap. If I deny, Eris will clap. I write instead."};
-    locationEntries["meta/guilt/day7"] = {"Release is not forgiveness. It is only the knife put down after the cut."};
+    // Guilt beats
+    locationEntries["meta/guilt/day1"] = {"I wrote her new name to keep her safe. Names travel faster than truth.", ""};
+    locationEntries["meta/guilt/day2"] = {"Cassandra was a kindness I could live with. Melas was a child I could not lose.", ""};
+    locationEntries["meta/guilt/day3"] = {"Exile was supposed to be distance, not a sentence. I told myself the temple would quiet down.", ""};
+    locationEntries["meta/guilt/day4"] = {"When the others turned against her, they were following me. I keep walking.", ""};
+    locationEntries["meta/guilt/day5"] = {"If she returns, she will use the name I gave her. I have made a stranger whose face I know.", ""};
+    locationEntries["meta/guilt/day6"] = {"If I confess, Eris will clap. If I deny, Eris will clap. I write instead.", ""};
+    locationEntries["meta/guilt/day7"] = {"Release is not forgiveness. It is only the knife put down after the cut.", ""};
 }
+
 
 void JournalManager::writeLysaiaGuiltBeat(int day) {
     const std::string key = "meta/guilt/day" + std::to_string(day);
@@ -260,11 +260,18 @@ void JournalManager::writeMelasAt(const std::string& locationID, bool forceHallu
     // Write the true entry for this location
     melasEntries.emplace_back(it->second.actual);
 
-    // 50% chance (or forced) to add the paired hallucination
+    // Decide if we add a hallucination
     if (forceHallucination || (std::rand() % 2 == 0)) {
-        writeCorruptedLine(it->second.hallucination);
+        if (!it->second.hallucination.empty()) {
+            // Use the location-specific hallucination
+            writeCorruptedLine(it->second.hallucination);
+        } else {
+            // Fallback to the generic hallucination pool
+            writeCorrupted();
+        }
     }
 }
+
 
 void JournalManager::addPlayerNoteToMelas(int index, const std::string& note) {
     if (index >= 0 && index < static_cast<int>(melasEntries.size())) {

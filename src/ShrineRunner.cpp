@@ -11,7 +11,7 @@ static std::string lower(std::string s) {
     return s;
 }
 
-static Deity DeityFromName(const std::string& deityName) {
+Deity DeityFromName(const std::string& deityName) {
     const std::string d = lower(deityName);
     if (d == "demeter")                     return Deity::Demeter;
     if (d == "nyx")                         return Deity::Nyx;
