@@ -155,15 +155,9 @@ static InteractionContext MakeCtx() {
     };
 }
 
-// ---- OPTIONAL: sync to/from your existing Player class ----------------------
-// Implement these if you want Player and PlayerState to mirror each other.
-// Otherwise you can let mechanics own stats internally.
-static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {
-    // TODO: map your Player fields -> s.stats / s.corruption
-}
-static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {
-    // TODO: map back if your UI/HUD reads from Player
-}
+static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {}
+static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {}
+
 
 // ---- Public-ish helpers you will call from your flow ------------------------
 static void InitMechanics(JournalManager* jm, bool isMelasPlaythrough) {
