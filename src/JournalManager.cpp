@@ -1,5 +1,6 @@
 // JournalManager.cpp (Location-aware, dual journals, hallucinations)
 #include "JournalManager.hpp"
+#include "utils.hpp"
 #include <iostream>
 #include <unordered_map>
 #include <fstream>
@@ -267,44 +268,6 @@ void JournalManager::loadDefaultLocationEntries() {
 }
 
 // -----------------------------
-// Lysaia (read-only to player)
-// -----------------------------
-void JournalManager::writeLysaia(const std::string& entry) {
-    lysaiaEntries.emplace_back(entry);
-    showLysaiaJournal = true; // visible during her playthrough
-}
-
-void JournalManager::writeLysaiaAt(const std::string& locationID) {
-    auto it = locationEntries.find(locationID);
-    if (it != locationEntries.end()) {
-        writeLysaia(it->second.actual);
-    }
-}
-
-void JournalManager::viewLysaia() const {
-    if (!showLysaiaJournal) {
-        std::cout << "You have no access to these entries right now.\n";
-        return;
-    }
-
-    if (lysaiaEntries.empty()) {
-        std::cout << "Lysaia's journal is empty.\n";
-        return;
-    }
-
-    std::cout << "\n=== Lysaia's Journal ===\n";
-    for (size_t i = 0; i < lysaiaEntries.size(); ++i) {
-        std::cout << "\nEntry " << i + 1 << ":\n";
-        std::cout << lysaiaEntries[i].content << "\n";
-    }
-    std::cout << "========================\n";
-}
-
-void JournalManager::unlockLysaiaJournal() {
-    showLysaiaJournal = true;
-}
-
-// -----------------------------
 // Melas (interactive)
 // -----------------------------
 void JournalManager::writeMelas(const std::string& entry) {
@@ -453,21 +416,32 @@ void JournalManager::printJournal() {
     }
 }
 void JournalManager::inspectEntry(int index) const {
-    if (index < 0 || index >= static_cast<int>(melasEntries.size())) {
-        std::cout << "No such entry.\n";
+    if (showLysaiaJournal) {
+        // Inspect Lysaia entry
+        if (index <= 0 || static_cast<size_t>(index) > lysaiaEntries.size()) {
+            std::cout << "No such entry.\n";
+            return;
+        }
+        const auto& e = lysaiaEntries[static_cast<size_t>(index) - 1];
+        std::cout << "\n--- Inspecting Entry " << index << " ---\n";
+        std::cout << e.content << "\n";
+        std::cout << "---------------------------------\n";
         return;
     }
 
-    const auto& entry = melasEntries[index];
-    std::cout << "\n--- Inspecting Entry " << index + 1 << " ---\n";
-    std::cout << entry.content << "\n";
-
-    if (!entry.originalContent.empty()) {
-        std::cout << "[Original Entry]: " << entry.originalContent << "\n";
+    // Inspect Melas entry
+    if (index <= 0 || static_cast<size_t>(index) > melasEntries.size()) {
+        std::cout << "No such entry.\n";
+        return;
     }
-
-    if (!entry.playerNote.empty()) {
-        std::cout << "[Your Note]: " << entry.playerNote << "\n";
+    const auto& e = melasEntries[static_cast<size_t>(index) - 1];
+    std::cout << "\n--- Inspecting Entry " << index << " ---\n";
+    std::cout << e.content << "\n";
+    if (!e.originalContent.empty()) {
+        std::cout << "[Original Entry]: " << e.originalContent << "\n";
+    }
+    if (!e.playerNote.empty()) {
+        std::cout << "[Your Note]: " << e.playerNote << "\n";
     }
     std::cout << "---------------------------------\n";
 }
