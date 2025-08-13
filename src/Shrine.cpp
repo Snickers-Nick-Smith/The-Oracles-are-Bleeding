@@ -1,54 +1,42 @@
+// Shrine.cpp
 #include "Shrine.hpp"
 #include <iostream>
 
 // Constructor
 Shrine::Shrine(const std::string& deity, const std::string& shrineRoom)
-    : deityName(deity), shrineRoomName(shrineRoom), state(ShrineState::UNCORRUPTED) {}
+    : deityName(deity), shrineRoomName(shrineRoom) {}
 
-// State Handling
-void Shrine::setState(ShrineState newState) {
-    state = newState;
-}
+// State
+void Shrine::setState(ShrineState newState) { state = newState; }
+ShrineState Shrine::getState() const { return state; }
 
-ShrineState Shrine::getState() const {
-    return state;
-}
+// Names
+const std::string& Shrine::getName() const noexcept { return deityName; }
+std::string Shrine::getDeityName() const { return deityName; }
+std::string Shrine::getShrineRoomName() const { return shrineRoomName; }
 
-// Getters
-std::string Shrine::getDeityName() const {
-    return deityName; // change to const std::string& if you want to avoid copies
-}
+// Rooms
+void Shrine::addAssociatedRoom(const Room& room) { associatedRooms.push_back(room); }
+const std::vector<Room>& Shrine::getAssociatedRooms() const { return associatedRooms; }
 
-const std::string& Shrine::getName() const noexcept {
-    return deityName;
-}
-
-std::string Shrine::getShrineRoomName() const {
-    return shrineRoomName;
-}
-
-void Shrine::addAssociatedRoom(const Room& room) {
-    associatedRooms.push_back(room);
-}
-
-const std::vector<Room>& Shrine::getAssociatedRooms() const {
-    return associatedRooms;
-}
-
-// Output logic for shrine (basic for now)
+// Presentation
 void Shrine::describeShrine() const {
-    std::cout << "Shrine of " << deityName << ": " << shrineRoomName << '\n';
-    std::cout << "Current state: " << (state == ShrineState::UNCORRUPTED ? "Uncorrupted" : "Corrupted") << '\n';
+    std::cout << "Shrine of " << deityName << " — " << shrineRoomName << "\n";
+    std::cout << "Current state: "
+              << (state == ShrineState::UNCORRUPTED ? "Uncorrupted" : "Corrupted")
+              << "\n";
     std::cout << "You feel a presence...\n";
 
-    std::cout << "\nAssociated rooms:\n";
-    for (const Room& r : associatedRooms) {
-        std::cout << "- " << r.getName() << '\n';
+    if (!associatedRooms.empty()) {
+        std::cout << "\nAssociated rooms:\n";
+        for (const Room& r : associatedRooms) {
+            std::cout << "- " << r.getName() << "\n";
+        }
     }
 }
 
-// Activate shrine: can be extended to call different logic
-void Shrine::activate(Player& player) {
+// Simple interaction
+void Shrine::activate(Player& /*player*/) {
     describeShrine();
 
     if (state == ShrineState::CORRUPTED) {

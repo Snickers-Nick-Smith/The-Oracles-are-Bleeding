@@ -1,8 +1,15 @@
 #include "Game.hpp"
 #include "SceneManager.hpp"
+#include "UI.hpp"
 #include "Shrine.hpp"
 #include "utils.hpp"
 #include "Theme.hpp"
+#include "Mechanics.hpp"
+#include "ShrineBehavior.hpp"
+#include "PersephoneFragments.hpp"
+#include "FragmentPlacer.hpp"
+#include "ShrineRunner.hpp"
+#include "JournalManager.hpp"
 #include "prologueController.hpp" 
 #include <unordered_map>
 #include <iostream>
@@ -99,6 +106,104 @@ Deity Game::deityFromRoomName(const std::string& roomName) const {
     auto it = kRoomToDeity.find(key);
     return (it != kRoomToDeity.end()) ? it->second : Deity::Default;
 }
+
+// =================== Mechanics Integration Bridge ============================
+static RNG                     g_rng;
+static PlayerState             g_pstate;
+static std::unordered_map<std::string, bool> g_flags;
+
+// ---- Journal bridge (to your JournalManager) --------------------------------
+struct JournalBridge : IJournalSink {
+    JournalManager* jm = nullptr;  // set this in InitMechanics()
+    void writeLysaia(const std::string& entry) override {
+        if (jm) jm->writeLysaia(entry); else std::cout << "[Lysaia] " << entry << "\n";
+    }
+    void writeMelas(const std::string& entry) override {
+        if (jm) jm->writeMelas(entry); else std::cout << "[Melas] " << entry << "\n";
+    }
+};
+static JournalBridge g_journal;
+
+// ---- Minimal UI lambdas for prompts ----------------------------------------
+static UI g_ui {
+    /*print*/ [](const std::string& s){ std::cout << s << "\n"; },
+    /*choose*/[](const std::string& prompt, const std::vector<std::string>& opts){
+        std::cout << prompt << "\n";
+        for (size_t i=0;i<opts.size();++i) std::cout << "  " << (i+1) << ") " << opts[i] << "\n";
+        int pick=0; std::cout << "> "; std::cin >> pick; return pick;
+    },
+    /*ask*/   [](const std::string& prompt){
+        std::cout << prompt << "\n> ";
+        std::string s; std::getline(std::cin >> std::ws, s); return s;
+    },
+    /*wait*/  [](){ std::cout << "[Press Enter]"; std::cin.get(); }
+};
+
+// ---- Context factory --------------------------------------------------------
+static InteractionContext MakeCtx() {
+    return InteractionContext{
+        g_pstate,                  // PlayerState&
+        g_rng,                     // RNG&
+        g_journal,                 // IJournalSink&
+        g_pstate.view,             // WorldView (Lysaia vs. Melas)
+        ShrineState::UNCORRUPTED,  // default; ShrineRunner will override per-shrine
+        g_flags                    // flags map
+    };
+}
+
+// ---- OPTIONAL: sync to/from your existing Player class ----------------------
+// Implement these if you want Player and PlayerState to mirror each other.
+// Otherwise you can let mechanics own stats internally.
+static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {
+    // TODO: map your Player fields -> s.stats / s.corruption
+}
+static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {
+    // TODO: map back if your UI/HUD reads from Player
+}
+
+// ---- Public-ish helpers you will call from your flow ------------------------
+static void InitMechanics(JournalManager* jm, bool isMelasPlaythrough) {
+    g_journal.jm = jm;
+    g_pstate.view = isMelasPlaythrough ? WorldView::Corrupted : WorldView::Uncorrupted;
+
+    // Example starting stats; adjust as needed
+    g_pstate.stats = {/*health*/5, /*will*/7, /*insight*/2, /*nerve*/2};
+    g_pstate.corruption = isMelasPlaythrough ? 10 : 0;
+}
+
+static void OnRoomEntered(const std::string& roomTitle) {
+    auto ctx = MakeCtx();
+    // Persephone letter fragment auto-pickups (Melas only)
+    CheckPersephoneLetterPickupsForRoom(ctx, roomTitle);
+    // (If any pickup happened, the bridge already wrote the journal and applied outcomes)
+}
+
+static void OnShrineInteract(const Shrine& shrine, JournalManager* jm /*optional for Nyx/Hecate*/) {
+    auto ctx = MakeCtx();
+
+    ShrineServices svc;
+    // If your JournalManager exposes these, wire them; else leave nullptr
+    // svc.takeMelasEntry = [jm]() -> std::optional<std::string> { return jm->takeLastMelasEntry(); };
+    // svc.giveMelasEntry = [jm](const std::string& s) { jm->writeMelas(s); };
+
+    Outcome out = RunShrine(shrine, ctx, g_ui, svc);
+
+    // Apply result and log
+    g_pstate.applyOutcome(out);
+    if (!out.journalEntry.empty()) {
+        if (ctx.view == WorldView::Corrupted) g_journal.writeMelas(out.journalEntry);
+        else                               g_journal.writeLysaia(out.journalEntry);
+    }
+
+    // Endings check (optional)
+    if (g_flags["false_hermes_endless_hall"] || g_flags["thanatos_sleep_end"] ||
+        g_flags["ending_join_eris"] || g_flags["ending_save_lysaia"] ||
+        g_flags["ending_overcome"] || g_flags["ending_claimed"]) {
+        // TODO: return to menu / credits
+        // e.g., SceneManager::instance().goToMainMenu();
+    }
+}
+// ================= End Mechanics Integration Bridge ==========================
 
 // --- public helpers ----------------------------------------------------------
 
@@ -224,6 +329,8 @@ static std::string toLocationId(const std::string& roomName) {
 // Room Descriptor
 void Game::describeCurrentRoom() {
     const int id = player.getCurrentRoom();
+    const Room& current = rooms[id];  
+    OnRoomEntered(current.getName());
     const Room& current = rooms[id];
 
     // Color the room description based on deity
@@ -239,6 +346,7 @@ void Game::describeCurrentRoom() {
         std::cout << "Exits: " << join(exits, ", ") << "\n";
     }
 }
+
 
 void Game::runLysaiaPrologue() {
     PrologueController::Hooks hooks;
@@ -349,6 +457,7 @@ Game::Game() : isRunning(true) {
 
 
 void Game::startLysaiaPrologue() {
+    InitMechanics(&journalManager, /*isMelasPlaythrough=*/false);
     rooms.clear();
     shrineRegistry.clear();
     roomConnections.clear();
@@ -514,6 +623,7 @@ void Game::showMap() {
 
 void Game::start() {
     SceneManager::introScene();
+    InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
     loadRooms();
     gameLoop();
 }
@@ -521,6 +631,7 @@ void Game::start() {
 void Game::loadRooms() {
     rooms.clear();
     shrineRegistry.clear();
+
     roomConnections.clear();
 
     // ===== Main Hall =====
@@ -749,21 +860,36 @@ void Game::handleCommand(const std::string& input) {
         return;
     }
 
-    // ===== Shrine interaction =====
-    if (cmd == "shrine") {
-        Room& current = rooms[player.getCurrentRoom()];
-        if (current.isShrine()) {
-            int shrineID = current.getShrineID();
-            if (shrineRegistry.count(shrineID)) {
-                shrineRegistry[shrineID].activate(player);
-            } else {
-                std::cout << "The shrine seems dormant.\n";
-            }
-        } else {
-            std::cout << "There is no shrine here.\n";
-        }
+   // ===== Shrine interaction =====
+if (cmd == "shrine") {
+    const int cur = player.getCurrentRoom();
+    if (cur < 0 || cur >= static_cast<int>(rooms.size())) {
+        std::cout << "You are nowhere near a shrine.\n";
         return;
     }
+
+    Room& current = rooms[cur];
+    if (!current.isShrine()) {
+        std::cout << "There is no shrine here.\n";
+        return;
+    }
+
+    const int shrineID = current.getShrineID();
+    auto it = shrineRegistry.find(shrineID);
+    if (it == shrineRegistry.end()) {
+        std::cout << "The shrine seems dormant.\n";
+        return;
+    }
+
+    // Optional flavor lead-in (styled per deity/state)
+    printShrineText(it->second, "You approach the altar.", /*shake=*/false);
+
+    // Mechanics dispatcher (runs the real shrine logic + outcomes/journal)
+    OnShrineInteract(it->second, &journalManager);
+    return;
+}
+
+
 
     // ===== Look around =====
     if (first == "look" || cmd == "look around") {

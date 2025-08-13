@@ -14,3 +14,4 @@ void SceneManager::introScene() {
 void SceneManager::erisFinalScene() {
     std::cout << "A mirror reflects someone else. The choir begins to hum.\n";
 }
+

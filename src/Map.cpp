@@ -147,3 +147,4 @@ void TempleMap::printAdjacency() const {
     }
     std::cout << "\nLegend: [S] = Shrine\n";
 }
+

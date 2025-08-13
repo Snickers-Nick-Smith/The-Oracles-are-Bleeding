@@ -1,3 +1,4 @@
+// Shrine.hpp
 #ifndef SHRINE_HPP
 #define SHRINE_HPP
 
@@ -5,38 +6,33 @@
 #include <vector>
 #include "Player.hpp"
 #include "Room.hpp"
-
-enum class ShrineState {
-    UNCORRUPTED,
-    CORRUPTED
-};
+#include "Theme.hpp"   // for ShrineState
 
 class Shrine {
 private:
     std::string deityName;
     std::string shrineRoomName;
-    ShrineState state;
+    ShrineState state = ShrineState::UNCORRUPTED;
     std::vector<Room> associatedRooms;
 
 public:
     Shrine(const std::string& deity, const std::string& shrineRoom);
 
-    // Getters
-    const std::string& getName() const noexcept;           // deity name
+    // Getters / setters
+    const std::string& getName() const noexcept;   // deity name (for UI coloring, etc.)
+    std::string getDeityName() const;              // same as getName(), kept for compatibility
+    std::string getShrineRoomName() const;
+
     ShrineState getState() const;
     void setState(ShrineState newState);
 
-    // If you prefer no copies, you can switch this to const std::string& too.
-    std::string getDeityName() const;
-    std::string getShrineRoomName() const;
-
+    // Room linkage (optional)
     void addAssociatedRoom(const Room& room);
     const std::vector<Room>& getAssociatedRooms() const;
 
+    // Interaction
     void describeShrine() const;
-    void activate(Player& player); // dynamic interaction
-
-    static void activateByID(int shrineID, Player& player); // (declare only if you plan to define it)
+    void activate(Player& player);
 };
 
-#endif
+#endif // SHRINE_HPP

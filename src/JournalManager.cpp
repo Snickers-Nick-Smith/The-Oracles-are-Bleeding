@@ -397,3 +397,4 @@ void JournalManager::inspectEntry(int index) const {
     }
     std::cout << "---------------------------------\n";
 }
+

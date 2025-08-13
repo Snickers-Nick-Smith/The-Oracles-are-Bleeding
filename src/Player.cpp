@@ -37,3 +37,4 @@ void Player::loadJournalFromFile() {
     journal.loadFromFile();
 }
 
+

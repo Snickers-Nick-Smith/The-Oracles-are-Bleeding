@@ -190,3 +190,4 @@ void ThemeRegistry::printDeityLine(Deity d,
         printWithSpeed(styled, as, /*endWithNewline*/true);
     }
 }
+
