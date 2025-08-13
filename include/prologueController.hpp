@@ -1,18 +1,20 @@
+// prologueController.hpp
 #pragma once
-#include <string>
 #include <functional>
+#include <string>
 
-class PrologueController {
-public:
+struct PrologueController {
     struct Hooks {
         std::function<void()> describe;
         std::function<void()> listExits;
         std::function<bool(const std::string&)> moveTo;
         std::function<void(int)> writeJournal;
         std::function<std::string()> promptPrefix;
+        // NEW: show the Lysaia journal
+        std::function<void()> showJournal;
     };
 
-    explicit PrologueController(Hooks hooks) : hooks_(std::move(hooks)) {}
+    explicit PrologueController(Hooks h) : hooks_(std::move(h)) {}
     void run();
 
 private:

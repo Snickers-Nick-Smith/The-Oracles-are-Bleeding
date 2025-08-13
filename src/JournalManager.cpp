@@ -1,6 +1,7 @@
 // JournalManager.cpp (Location-aware, dual journals, hallucinations)
 #include "JournalManager.hpp"
 #include <iostream>
+#include <unordered_map>
 #include <fstream>
 #include <cstdlib>
 #include <algorithm>
@@ -50,18 +51,32 @@ static const char* kGenericHallucinations[] = {
 };
 
 
-// -----------------------------
-// Definitions / Registry
-// -----------------------------
+// ---- Helpers ----------------------------------------------------------------
+// If your JournalEntry uses a different field name than `actual`,
+// change the return line below to e.text or e.content, etc.
+static inline const std::string& getText(const JournalEntry& e) {
+    return e.content;
+}
+
+// ---- Setup / Definitions -----------------------------------------------------
+
+void JournalManager::defineLocationEntry(const std::string& id,
+                                         const std::string& actual,
+                                         const std::string& hallucination) {
+    locationEntries[id] = EntryData{actual, hallucination};
+}
+
+// Optional: keep as-is if you already have this elsewhere.
+// Loads the uncorrupted prologue lines + guilt beats.
 void JournalManager::seedLysaiaPrologueText() {
     // Shrine attempts (uncorrupted)
     locationEntries["demeter/shrine_uncorrupted"]     = {"I brought offerings to Demeter and spoke plainly: feed what I starved. The grain did not bow. I bowed instead.", ""};
     locationEntries["nyx/shrine_uncorrupted"]         = {"At Nyx’s well I whispered my fear into the still water. The stars under the surface did not answer—perhaps they were listening.", ""};
-    locationEntries["apollo/shrine"]                  = {"In Apollo’s gallery my voice doubled back as song. I asked for truth. The echo repeated only what I already knew.", ""};
+    locationEntries["apollo/shrine_uncorrupted"]      = {"In Apollo’s gallery my voice doubled back as song. I asked for truth. The echo repeated only what I already knew.", ""};
     locationEntries["hecate/shrine_uncorrupted"]      = {"At the Luminous Path I asked for a door that opens only forward. The lanterns did not argue. I did.", ""};
     locationEntries["persephone/shrine_uncorrupted"]  = {"I asked Persephone how to hold two seasons at once. She remained kind, and silent.", ""};
     locationEntries["pan/shrine_uncorrupted"]         = {"I tried to speak softly to the earth. The earth spoke softly back, as if it pitied me.", ""};
-    locationEntries["false_hermes/shrine"]            = {"I greeted the messenger who isn’t. He smiled without teeth. I smiled with mine and said nothing else.", ""};
+    locationEntries["false_hermes/shrine_uncorrupted"]= {"I greeted the messenger who isn’t. He smiled without teeth. I smiled with mine and said nothing else.", ""};
     locationEntries["thanatos/shrine_uncorrupted"]    = {"I asked Thanatos if forgetting can be merciful. He made no promises, which felt like one.", ""};
     locationEntries["eris/shrine_uncorrupted"]        = {"I told Eris I would not play. She called that a move. I pretended not to hear the rules.", ""};
 
@@ -75,7 +90,6 @@ void JournalManager::seedLysaiaPrologueText() {
     locationEntries["meta/guilt/day7"] = {"Release is not forgiveness. It is only the knife put down after the cut.", ""};
 }
 
-
 void JournalManager::writeLysaiaGuiltBeat(int day) {
     const std::string key = "meta/guilt/day" + std::to_string(day);
     auto it = locationEntries.find(key);
@@ -84,10 +98,63 @@ void JournalManager::writeLysaiaGuiltBeat(int day) {
     }
 }
 
-void JournalManager::defineLocationEntry(const std::string& id,
-                                         const std::string& actual,
-                                         const std::string& hallucination) {
-    locationEntries[id] = EntryData{actual, hallucination};
+// ---- Lysaia journal (read-only) ---------------------------------------------
+
+void JournalManager::writeLysaia(const std::string& entry) {
+    JournalEntry je{};
+    je.content = entry;                 // <-- change if your text field is named differently
+    lysaiaEntries.emplace_back(std::move(je));
+}
+
+void JournalManager::writeLysaiaAt(const std::string& locationID) {
+    auto it = locationEntries.find(locationID);
+    if (it != locationEntries.end()) {
+        writeLysaia(it->second.actual);
+    }
+}
+
+void JournalManager::viewLysaia() const {
+    if (!showLysaiaJournal) {
+        std::cout << "(Lysaia’s journal is locked.)\n";
+        return;
+    }
+    // This mutates state; if you want corruption on view, remove 'const' and call it.
+    // maybeCorruptOneOnView();
+    printLysaia(std::cout);
+}
+
+void JournalManager::inspectEntry(int index) const {
+    if (index <= 0 || static_cast<size_t>(index) > lysaiaEntries.size()) {
+        std::cout << "(No such entry.)\n";
+        return;
+    }
+    const JournalEntry& e = lysaiaEntries[static_cast<size_t>(index) - 1];
+    std::cout << "[" << index << "] " << getText(e) << "\n";
+}
+
+void JournalManager::unlockLysaiaJournal() {
+    showLysaiaJournal = true;
+}
+
+bool JournalManager::hasLysaia() const {
+    return !lysaiaEntries.empty();
+}
+
+void JournalManager::printLysaia(std::ostream& out) const {
+    if (lysaiaEntries.empty()) {
+        out << "(Lysaia’s journal is empty.)\n";
+        return;
+    }
+    out << "— Lysaia’s Journal —\n";
+    for (size_t i = 0; i < lysaiaEntries.size(); ++i) {
+        out << (i + 1) << ". " << getText(lysaiaEntries[i]) << "\n";
+    }
+}
+
+void JournalManager::printLastLysaia(std::ostream& out) const {
+    if (!lysaiaEntries.empty()) {
+        out << "(Journal updated) " << getText(lysaiaEntries.back()) << "\n";
+    }
 }
 
 void JournalManager::loadDefaultLocationEntries() {

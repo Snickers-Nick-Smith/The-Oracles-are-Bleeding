@@ -19,10 +19,6 @@
 #include <cstdlib>
 #include <sstream>
 
-namespace {
-    std::string normalize_dir(std::string d); // forward declare
-}
-
 // --- deity inference helpers -------------------------------------------------
 
 Deity Game::deityFromShrineName(const std::string& name) const {
@@ -344,7 +340,6 @@ void Game::describeCurrentRoom() {
     }
 }
 
-
 void Game::runLysaiaPrologue() {
     PrologueController::Hooks hooks;
 
@@ -432,6 +427,10 @@ hooks.writeJournal = [this](int day) {
     journalManager.writeLysaiaGuiltBeat(day);
 
     std::cout << "You light the candle and write. The ink dries in steady lines.\n";
+};
+
+hooks.showJournal = [this]() {
+    journalManager.printLysaia(std::cout);
 };
 
     hooks.promptPrefix = [this]() -> std::string {
@@ -790,54 +789,6 @@ void Game::setupConnections() {
     roomConnections[27]["east"] = 28; roomConnections[28]["west"] = 27;
     roomConnections[25]["down"] = 0; roomConnections[26]["down"] = 0; roomConnections[27]["down"] = 0; roomConnections[28]["down"] = 0;
 }
-
-namespace {
-    std::string trim_copy(std::string s) {
-        auto not_space = [](int ch){ return !std::isspace(ch); };
-        s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
-        s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
-        return s;
-    }
-
-    // Split into first word (lowercased) and the rest (trimmed, original case kept so notes work)
-    std::pair<std::string,std::string> split_first(const std::string& input) {
-        std::istringstream iss(input);
-        std::string first;
-        iss >> first;
-        std::string rest;
-        std::getline(iss, rest);
-        if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
-        return { toLower(first), trim_copy(rest) };
-    }
-
-    // Normalize direction tokens: supports full, hyphenless, and short forms.
-    // Returns empty string if not a direction.
-    std::string normalize_dir(std::string d) {
-        d = toLower(d);
-        if (d == "n")  return "north";
-        if (d == "s")  return "south";
-        if (d == "e")  return "east";
-        if (d == "w")  return "west";
-        if (d == "ne") return "northeast";
-        if (d == "nw") return "northwest";
-        if (d == "se") return "southeast";
-        if (d == "sw") return "southwest";
-        if (d == "u" || d == "up") return "up";
-        if (d == "d" || d == "down") return "down";
-        // already full word? pass through if valid
-        static const std::vector<std::string> dirs = {
-            "north","south","east","west",
-            "northeast","northwest","southeast","southwest",
-            "up","down"
-        };
-        return (std::find(dirs.begin(), dirs.end(), d) != dirs.end()) ? d : std::string{};
-    }
-
-    bool is_move_verb(const std::string& w) {
-        return w == "go" || w == "move" || w == "walk" || w == "run" || w == "head" || w == "travel";
-    }
-}
-
 
 void Game::handleCommand(const std::string& input) {
     const std::string raw = trim_copy(input);

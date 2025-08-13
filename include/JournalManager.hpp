@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <iosfwd> 
 #include <unordered_map>
 
 // A single journal page as shown to the player
@@ -55,6 +56,9 @@ public:
     void viewLysaia() const;
     void inspectEntry(int index) const;
     void unlockLysaiaJournal();
+    bool hasLysaia() const;
+    void printLysaia(std::ostream& out) const;
+    void printLastLysaia(std::ostream& out) const;
 
     // -----------------------------
     // Melas journal (interactive)

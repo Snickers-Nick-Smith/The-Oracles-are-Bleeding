@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <random>
 #include <sstream>
-#include <string>
 #include <thread>
 #include <iostream>
+#include <vector>
 #if defined(_WIN32)
   #include <io.h>
   #include <windows.h>
@@ -19,6 +19,7 @@
   #include <unistd.h>
   #define ISATTY isatty
 #endif
+
 
 
 void slowPrint(const std::string& text, unsigned int ms) {
@@ -102,6 +103,51 @@ void writeRaw(std::string_view s) {
 void flush() {
     std::fflush(stdout);
 }
+
+ std::string trim_copy(std::string s) {
+        auto not_space = [](int ch){ return !std::isspace(ch); };
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
+        s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
+        return s;
+    }
+
+    // Split into first word (lowercased) and the rest (trimmed, original case kept so notes work)
+    std::pair<std::string,std::string> split_first(const std::string& input) {
+        std::istringstream iss(input);
+        std::string first;
+        iss >> first;
+        std::string rest;
+        std::getline(iss, rest);
+        if (!rest.empty() && rest[0] == ' ') rest.erase(0, 1);
+        return { toLower(first), trim_copy(rest) };
+    }
+
+    // Normalize direction tokens: supports full, hyphenless, and short forms.
+    // Returns empty string if not a direction.
+    std::string normalize_dir(std::string d) {
+        d = toLower(d);
+        if (d == "n")  return "north";
+        if (d == "s")  return "south";
+        if (d == "e")  return "east";
+        if (d == "w")  return "west";
+        if (d == "ne") return "northeast";
+        if (d == "nw") return "northwest";
+        if (d == "se") return "southeast";
+        if (d == "sw") return "southwest";
+        if (d == "u" || d == "up") return "up";
+        if (d == "d" || d == "down") return "down";
+        // already full word? pass through if valid
+        static const std::vector<std::string> dirs = {
+            "north","south","east","west",
+            "northeast","northwest","southeast","southwest",
+            "up","down"
+        };
+        return (std::find(dirs.begin(), dirs.end(), d) != dirs.end()) ? d : std::string{};
+    }
+
+    bool is_move_verb(const std::string& w) {
+        return w == "go" || w == "move" || w == "walk" || w == "run" || w == "head" || w == "travel";
+    }
 
 std::string ansi(std::string_view seq) {
     if (!ansiCapable()) return std::string{};
