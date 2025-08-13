@@ -50,6 +50,7 @@ private:
     void setupConnections();   // connect rooms in current map
 
     // ===== Main game (Melas, etc.) =====
+    void beginMelasRun();
     void gameLoop();           // full loop (not used by prologue)
     void handleCommand(const std::string& input);
     void toggleAccessibility();

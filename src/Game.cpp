@@ -454,7 +454,12 @@ Game::Game() : isRunning(true) {
 
 
 void Game::startLysaiaPrologue() {
+    ThemeRegistry::setDefaultShrineState(ShrineState::UNCORRUPTED);
+
     InitMechanics(&journalManager, /*isMelasPlaythrough=*/false);
+    journalManager.seedLysaiaPrologueText();
+    journalManager.unlockLysaiaJournal();
+
     rooms.clear();
     shrineRegistry.clear();
     roomConnections.clear();
@@ -576,10 +581,19 @@ void Game::startLysaiaPrologue() {
         "A vaulted chamber filled with soft music and the glow of stained glass. Dust motes drift in the warm light.", true, 8));
 
     setupConnections();
-    runLysaiaPrologue();
     lysaiaShrinesLogged_.clear();
-    journalManager.seedLysaiaPrologueText();
+
+    // Run exactly once.
     runLysaiaPrologue();
+}
+
+void Game::beginMelasRun() {
+    SceneManager::introScene();
+    InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
+    ThemeRegistry::setDefaultShrineState(ShrineState::CORRUPTED);
+    loadRooms();
+    describeCurrentRoom(); // show first room on start
+    gameLoop();
 }
 
 
@@ -597,8 +611,9 @@ void Game::displayMainMenu() {
 
         switch (choice) {
             case 1:
-                start();  // begin game loop
-                break;
+                 beginMelasRun();   // corrupted run after menu
+                 break;
+
             case 2:
                 toggleAccessibility();
                 break;
@@ -619,11 +634,11 @@ void Game::showMap() {
 }
 
 void Game::start() {
-    SceneManager::introScene();
-    InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
-    loadRooms();
-    gameLoop();
+    // Always run Lysaia first, then land in the main menu.
+    startLysaiaPrologue();
+    displayMainMenu();
 }
+
 
 void Game::loadRooms() {
     rooms.clear();
@@ -885,9 +900,6 @@ if (cmd == "shrine") {
     OnShrineInteract(it->second, &journalManager);
     return;
 }
-
-
-
     // ===== Look around =====
     if (first == "look" || cmd == "look around") {
        describeCurrentRoom();}
@@ -961,12 +973,23 @@ if (cmd == "shrine") {
 // (Adjust bodies later to your real logic.)
 
 void Game::toggleAccessibility() {
-    // TODO: flip your accessibility settings here if you have them stored.
-    // e.g., settings.colorEnabled = !settings.colorEnabled;
+    accessibility_.colorEnabled       = !accessibility_.colorEnabled;
+    accessibility_.screenShakeEnabled = !accessibility_.screenShakeEnabled;
+    std::cout << "Color: " << (accessibility_.colorEnabled ? "ON" : "OFF")
+              << ", Shake: " << (accessibility_.screenShakeEnabled ? "ON" : "OFF") << "\n";
 }
 
+
 void Game::gameLoop() {
-    // TODO: implement your main loop. For now, a no-op keeps the linker happy.
+    isRunning = true;
+    describeCurrentRoom();
+    while (isRunning) {
+        std::cout << "\n> ";
+        std::string line;
+        if (!std::getline(std::cin, line)) break;
+        if (line == "exit" || line == "quit") { isRunning = false; break; }
+        handleCommand(line);
+    }
 }
 
 
