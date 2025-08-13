@@ -1,6 +1,7 @@
 // Mechanics.hpp
 #pragma once
 #include "Theme.hpp"          // Deity, ShrineState
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <functional>
@@ -26,11 +27,11 @@ struct Stats {
     int nerve  = 2;
 
     void clamp() {
-        if (health < 0) health = 0; if (health > 10) health = 10;
-        if (will   < 0) will   = 0; if (will   > 10) will   = 10;
-        if (insight< 0) insight= 0; if (insight> 10) insight= 10;
-        if (nerve  < 0) nerve  = 0; if (nerve  > 10) nerve  = 10;
-    }
+    health  = std::clamp(health,  0, 10);
+    will    = std::clamp(will,    0, 10);
+    insight = std::clamp(insight, 0, 10);
+    nerve   = std::clamp(nerve,   0, 10);
+}
 };
 
 struct InventoryItem {

@@ -19,6 +19,10 @@
 #include <cstdlib>
 #include <sstream>
 
+namespace {
+    std::string normalize_dir(std::string d); // forward declare
+}
+
 // --- deity inference helpers -------------------------------------------------
 
 Deity Game::deityFromShrineName(const std::string& name) const {
@@ -178,7 +182,7 @@ static void OnRoomEntered(const std::string& roomTitle) {
     // (If any pickup happened, the bridge already wrote the journal and applied outcomes)
 }
 
-static void OnShrineInteract(const Shrine& shrine, JournalManager* jm /*optional for Nyx/Hecate*/) {
+static void OnShrineInteract(const Shrine& shrine, JournalManager* /* jm */) {
     auto ctx = MakeCtx();
 
     ShrineServices svc;
@@ -331,7 +335,6 @@ void Game::describeCurrentRoom() {
     const int id = player.getCurrentRoom();
     const Room& current = rooms[id];  
     OnRoomEntered(current.getName());
-    const Room& current = rooms[id];
 
     // Color the room description based on deity
     printRoomDescriptionColored(current, current.getDescription());
