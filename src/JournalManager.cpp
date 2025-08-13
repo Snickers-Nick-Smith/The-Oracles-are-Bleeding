@@ -124,15 +124,6 @@ void JournalManager::viewLysaia() const {
     printLysaia(std::cout);
 }
 
-void JournalManager::inspectEntry(int index) const {
-    if (index <= 0 || static_cast<size_t>(index) > lysaiaEntries.size()) {
-        std::cout << "(No such entry.)\n";
-        return;
-    }
-    const JournalEntry& e = lysaiaEntries[static_cast<size_t>(index) - 1];
-    std::cout << "[" << index << "] " << getText(e) << "\n";
-}
-
 void JournalManager::unlockLysaiaJournal() {
     showLysaiaJournal = true;
 }
