@@ -75,7 +75,7 @@ void JournalManager::seedLysaiaPrologueText() {
     locationEntries["nyx/shrine_uncorrupted"]         = {"At Nyx’s well I whispered my fear into the still water. The stars under the surface did not answer—perhaps they were listening.", ""};
     locationEntries["apollo/shrine_uncorrupted"]      = {"In Apollo’s gallery my voice doubled back as song. I asked for truth. The echo repeated only what I already knew.", ""};
     locationEntries["hecate/shrine_uncorrupted"]      = {"At the Luminous Path I asked for a door that opens only forward. The lanterns did not argue. I did.", ""};
-    locationEntries["persephone/shrine_uncorrupted"]  = {"I asked Persephone how to hold two seasons at once. She remained kind, and silent.", ""};
+    locationEntries["persephone/shrine_uncorrupted"]  = {"I asked Persephone how to hold two seasons at once. She remained kind, but silent.", ""};
     locationEntries["pan/shrine_uncorrupted"]         = {"I tried to speak softly to the earth. The earth spoke softly back, as if it pitied me.", ""};
     locationEntries["false_hermes/shrine_uncorrupted"]= {"I greeted the messenger who isn’t. He smiled without teeth. I smiled with mine and said nothing else.", ""};
     locationEntries["thanatos/shrine_uncorrupted"]    = {"I asked Thanatos if forgetting can be merciful. He made no promises, which felt like one.", ""};

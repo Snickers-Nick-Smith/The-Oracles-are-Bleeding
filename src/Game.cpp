@@ -389,45 +389,53 @@ hooks.writeJournal = [this](int day) {
     const int cur = player.getCurrentRoom();
     const Room& r = rooms[cur];
 
+    // Collect candidate location keys (some paths can produce the same key)
+    std::vector<std::string> keys;
+    keys.reserve(3);
+
     // 1) Room-specific entry (if mapped)
-    const std::string loc = toLocationId(r.getName());
-    if (!loc.empty()) {
-        journalManager.writeLysaiaAt(loc);
+    if (const std::string loc = toLocationId(r.getName()); !loc.empty()) {
+        keys.push_back(loc);
     } else {
         journalManager.writeLysaia("I wrote in an unmarked place, to keep it from becoming strange.");
     }
 
     // 2) Shrine attempt entry — first time only, if this room is a shrine
     if (r.isShrine() && !lysaiaShrinesLogged_.count(cur)) {
-        // prefer uncorrupted shrine location id if available; fall back to generic shrine id
-        std::string shrineKey = loc;
+        std::string shrineKey = toLocationId(r.getName()); // try direct mapping first
         if (shrineKey.empty()) {
-            // Derive by deity if needed (matches IDs we seeded)
-            const Deity d = deityFromRoomName(r.getName());
-            switch (d) {
-                case Deity::Demeter:    shrineKey = "demeter/shrine_uncorrupted"; break;
-                case Deity::Nyx:        shrineKey = "nyx/shrine_uncorrupted"; break;
-                case Deity::Apollo:     shrineKey = "apollo/shrine"; break;
-                case Deity::Hecate:     shrineKey = "hecate/shrine_uncorrupted"; break;
-                case Deity::Persephone: shrineKey = "persephone/shrine_uncorrupted"; break;
-                case Deity::Pan:        shrineKey = "pan/shrine_uncorrupted"; break;
-                case Deity::FalseHermes:shrineKey = "false_hermes/shrine"; break;
-                case Deity::Thanatos:   shrineKey = "thanatos/shrine_uncorrupted"; break;
-                case Deity::Eris:       shrineKey = "eris/shrine_uncorrupted"; break;
+            // derive by deity as fallback
+            switch (deityFromRoomName(r.getName())) {
+                case Deity::Demeter:     shrineKey = "demeter/shrine_uncorrupted"; break;
+                case Deity::Nyx:         shrineKey = "nyx/shrine_uncorrupted"; break;
+                case Deity::Apollo:      shrineKey = "apollo/shrine_uncorrupted"; break;
+                case Deity::Hecate:      shrineKey = "hecate/shrine_uncorrupted"; break;
+                case Deity::Persephone:  shrineKey = "persephone/shrine_uncorrupted"; break;
+                case Deity::Pan:         shrineKey = "pan/shrine_uncorrupted"; break;
+                case Deity::FalseHermes: shrineKey = "false_hermes/shrine_uncorrupted"; break;
+                case Deity::Thanatos:    shrineKey = "thanatos/shrine_uncorrupted"; break;
+                case Deity::Eris:        shrineKey = "eris/shrine_uncorrupted"; break;
                 default: break;
             }
         }
-        if (!shrineKey.empty()) {
-            journalManager.writeLysaiaAt(shrineKey);
-        }
+        if (!shrineKey.empty()) keys.push_back(shrineKey);
         lysaiaShrinesLogged_.insert(cur);
     }
 
-    // 3) Day-specific guilt beat
+    // 3) Write unique keys only (prevents duplicates)
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+    for (const auto& k : keys) {
+        journalManager.writeLysaiaAt(k);
+    }
+
+    // 4) Day-specific guilt beat
     journalManager.writeLysaiaGuiltBeat(day);
 
     std::cout << "You light the candle and write. The ink dries in steady lines.\n";
+    journalManager.printLastLysaia(std::cout);
 };
+
 
 hooks.showJournal = [this]() {
     journalManager.printLysaia(std::cout);
