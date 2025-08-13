@@ -957,5 +957,16 @@ if (cmd == "shrine") {
     std::cout << "Unknown command. Type 'help' for a list of commands.\n";
 }
 
+// --- Temporary minimal implementations to satisfy linker ---
+// (Adjust bodies later to your real logic.)
+
+void Game::toggleAccessibility() {
+    // TODO: flip your accessibility settings here if you have them stored.
+    // e.g., settings.colorEnabled = !settings.colorEnabled;
+}
+
+void Game::gameLoop() {
+    // TODO: implement your main loop. For now, a no-op keeps the linker happy.
+}
 
 

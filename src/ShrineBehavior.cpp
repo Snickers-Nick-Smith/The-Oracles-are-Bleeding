@@ -74,6 +74,25 @@ Outcome RunDemeterLetter_FromInventory(InteractionContext& ctx, UI& ui) {  Outco
     return out;
 }
 
+// Show the uncorrupted Demeter letter using a provided set of lines.
+// Minimal implementation: prints lines, records success.
+Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx,
+                                      UI& ui,
+                                      const std::vector<std::string>& choices)
+{
+    for (const auto& line : choices) {
+        ui.print(line);
+    }
+
+    Outcome out;
+    out.journalEntry =
+        "You read Demeter’s uncorrupted letter in full. The meaning settles like clean snow. "
+        "(+1 Insight)";
+    out.insightDelta += 1;
+    ctx.flags["demeter_letter_solved"] = true; // mark as learned/resolved
+    return out;
+}
+
 Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx, UI& ui) {
     return ShowDemeterLetter_Uncorrupted(ctx, ui, kPersephoneLetterClean);
 }

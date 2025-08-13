@@ -25,11 +25,9 @@ struct Riddle {
 
 // Demeter
 Outcome RunDemeterLetter_FromInventory(InteractionContext& ctx, UI& ui);
-Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx,
-                                      UI& ui,
-                                      const std::vector<std::string>& lines);
-Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx, UI& ui); // 2-arg forwarder
-
+Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx, UI& ui);
+Outcome ShowDemeterLetter_Uncorrupted(InteractionContext& ctx, UI& ui,
+                                      const std::vector<std::string>& choices);
 // Nyx
 Outcome RunNyxTrade(InteractionContext& ctx, UI& ui,
                     TakeMelasEntryFn take = {},
