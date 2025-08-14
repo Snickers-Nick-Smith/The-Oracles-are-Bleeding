@@ -107,6 +107,8 @@ Deity Game::deityFromRoomName(const std::string& roomName) const {
     return (it != kRoomToDeity.end()) ? it->second : Deity::Default;
 }
 
+static std::string toLocationId(const std::string& roomName);
+
 // =================== Mechanics Integration Bridge ============================
 static RNG                     g_rng;
 static PlayerState             g_pstate;
@@ -167,9 +169,28 @@ static void InitMechanics(JournalManager* jm, bool isMelasPlaythrough) {
 
 static void OnRoomEntered(const std::string& roomTitle) {
     auto ctx = MakeCtx();
+
     // Persephone letter fragment auto-pickups (Melas only)
     CheckPersephoneLetterPickupsForRoom(ctx, roomTitle);
-    // (If any pickup happened, the bridge already wrote the journal and applied outcomes)
+
+    // --- NEW: journal an entry for Melas upon first entering any room ---
+    if (ctx.view == WorldView::Corrupted && g_journal.jm) {
+        if (const std::string loc = toLocationId(roomTitle); !loc.empty()) {
+            // de-dupe using flags map; no header changes needed
+            const std::string flagKey = std::string("visited:") + loc;
+            if (!g_flags[flagKey]) {
+                g_flags[flagKey] = true;
+                g_journal.jm->writeMelasAt(loc);
+            }
+        } else {
+            // Fallback line for unmapped rooms (won’t spam due to flag)
+            const std::string flagKey = std::string("visited:raw:") + roomTitle;
+            if (!g_flags[flagKey]) {
+                g_flags[flagKey] = true;
+                g_journal.writeMelas("I stepped into an unnamed place. The walls remembered before I did.");
+            }
+        }
+    }
 }
 
 static void OnShrineInteract(const Shrine& shrine, JournalManager* /* jm */) {
@@ -599,10 +620,11 @@ void Game::beginMelasRun() {
     InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
     ThemeRegistry::setDefaultShrineState(ShrineState::CORRUPTED);
     loadRooms();
-    describeCurrentRoom(); // show first room on start
+
+    // Make sure the loop prints once on entry
+    firstFramePrinted_ = false;
     gameLoop();
 }
-
 
 void Game::displayMainMenu() {
     int choice;
@@ -929,8 +951,6 @@ if (cmd == "shrine") {
 }
 
 // --- Temporary minimal implementations to satisfy linker ---
-// (Adjust bodies later to your real logic.)
-
 void Game::toggleAccessibility() {
     accessibility_.colorEnabled       = !accessibility_.colorEnabled;
     accessibility_.screenShakeEnabled = !accessibility_.screenShakeEnabled;
@@ -938,27 +958,9 @@ void Game::toggleAccessibility() {
               << ", Shake: " << (accessibility_.screenShakeEnabled ? "ON" : "OFF") << "\n";
 }
 
-
-// Game.cpp
 void Game::gameLoop() {
     isRunning = true;
-
-    // Print the current room exactly once when the main loop starts.
     if (!firstFramePrinted_) {
         describeCurrentRoom();
         firstFramePrinted_ = true;
     }
-
-    while (isRunning) {
-        std::cout << "\n> ";
-        std::string line;
-        if (!std::getline(std::cin, line)) break;
-
-        if (line == "exit" || line == "quit") {
-            isRunning = false;
-            break;
-        }
-        
-        handleCommand(line);
-    }
-}
