@@ -22,13 +22,17 @@ namespace {
 
 void PrologueController::run() {
     constexpr int kMaxDays = 7;
-    std::cout << "\n(Prologue) Type 'help' for commands.\n";
+    std::cout << "\n(Prologue) Type 'help' for commands.\n" << std::flush;
 
     for (int day = 1; day <= kMaxDays; ++day) {
-        std::cout << "\n— Day " << day << " —\n";
-         if (day == 1) {
-        printPrologueHelpBanner();   // <- show once at the beginning
-    }
+        std::cout << "\n— Day " << day << " —\n" << std::flush;
+
+        if (day == 1) {
+            // Show the banner BEFORE any room text
+            printPrologueHelpBanner();
+        }
+
+        // Show room, then exits immediately so directions are obvious
         hooks_.describe();
         hooks_.listExits();
 
