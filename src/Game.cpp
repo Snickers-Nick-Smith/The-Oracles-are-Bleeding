@@ -110,6 +110,16 @@ Deity Game::deityFromRoomName(const std::string& roomName) const {
 
 static std::string toLocationId(const std::string& roomName);
 
+static void printLysaiaHelpBanner() {
+    std::cout
+        << "\n— Lysaia’s Prologue —\n"
+        << "Commands:\n"
+        << "  look / look around      reprint the room\n"
+        << "  exits                   list available directions\n"
+        << "  n,s,e,w,ne,nw,se,sw,u,d or go/move <dir>\n"
+        << "  journal                 read your entries\n"
+        << "  help                    show commands\n";
+}
 // =================== Mechanics Integration Bridge ============================
 static RNG                     g_rng;
 static PlayerState             g_pstate;
@@ -478,8 +488,8 @@ hooks.showJournal = [this]() {
     return oss.str();
 };
 
-
-
+printLysaiaHelpBanner();
+describeCurrentRoom();
     PrologueController prologue(hooks);
     std::cin.clear();
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
