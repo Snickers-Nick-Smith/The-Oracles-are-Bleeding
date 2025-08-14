@@ -471,10 +471,9 @@ hooks.showJournal = [this]() {
 
 
     PrologueController prologue(hooks);
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     prologue.run();
-
-    // Dump to main menu when done
-    displayMainMenu();
 }
 
 Game::Game() : isRunning(true) {
@@ -617,14 +616,18 @@ void Game::startLysaiaPrologue() {
 
 void Game::beginMelasRun() {
     SceneManager::introScene();
+
+    // Flush any leftover input from the intro scene
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
     InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
     ThemeRegistry::setDefaultShrineState(ShrineState::CORRUPTED);
     loadRooms();
-
-    // Make sure the loop prints once on entry
     firstFramePrinted_ = false;
     gameLoop();
 }
+
 
 void Game::displayMainMenu() {
     int choice;
@@ -635,18 +638,25 @@ void Game::displayMainMenu() {
         std::cout << "3. View Temple Map\n";
         std::cout << "4. Exit\n";
         std::cout << "Choice: ";
-        std::cin >> choice;
-        std::cin.ignore();
+
+        if (!(std::cin >> choice)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+        // flush trailing newline so gameLoop's getline() works
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         switch (choice) {
             case 1:
-                 beginMelasRun();   // corrupted run after menu
-                 break;
-
+                beginMelasRun();
+                break;
             case 2:
                 toggleAccessibility();
                 break;
-            case 3: showMap(); break;
+            case 3:
+                showMap();
+                break;
             case 4:
                 isRunning = false;
                 break;
@@ -655,6 +665,7 @@ void Game::displayMainMenu() {
         }
     } while (isRunning);
 }
+
 
 void Game::showMap() {
     std::cout << "\n";
