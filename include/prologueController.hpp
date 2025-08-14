@@ -12,6 +12,7 @@ struct PrologueController {
         std::function<std::string()> promptPrefix;
         // NEW: show the Lysaia journal
         std::function<void()> showJournal;
+        std::function<void()> showHelp;
     };
 
     explicit PrologueController(Hooks h) : hooks_(std::move(h)) {}
