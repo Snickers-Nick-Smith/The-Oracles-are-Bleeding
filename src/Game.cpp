@@ -384,7 +384,12 @@ void Game::describeCurrentRoom() {
 void Game::runLysaiaPrologue() {
     PrologueController::Hooks hooks;
 
-    hooks.describe = [this]() { describeCurrentRoom(); };
+    // Show the current room (OnRoomEntered fires only on true entry; your lastEnteredRoom_ guard handles spam)
+    hooks.describe = [this]() {
+        describeCurrentRoom();
+    };
+
+    // List exits from the current room
     hooks.listExits = [this]() {
         const int cur = player.getCurrentRoom();
         auto it = roomConnections.find(cur);
@@ -398,25 +403,26 @@ void Game::runLysaiaPrologue() {
         std::sort(dirs.begin(), dirs.end());
         std::cout << "Exits: " << join(dirs, ", ") << "\n";
     };
-   hooks.moveTo = [this](const std::string& target) -> bool {
-        // Try direction first (supports n, sw, up, etc.) using your normalize_dir()
+
+    // Move by direction token or by visible neighbor room title. DO NOT print here; return true if moved.
+    hooks.moveTo = [this](const std::string& target) -> bool {
+        // direction?
         if (auto dir = normalize_dir(target); !dir.empty()) {
             player.move(dir, roomConnections);
-            describeCurrentRoom();
             return true;
         }
-        // Try room title among visible neighbors
+        // neighbor title?
         const int cur = player.getCurrentRoom();
         auto it = roomConnections.find(cur);
-        if (it == roomConnections.end()) { std::cout << "You can’t move from here.\n"; return false; }
-
+        if (it == roomConnections.end()) {
+            std::cout << "You can’t move from here.\n";
+            return false;
+        }
         const std::string t = toLower(target);
         for (const auto& kv : it->second) {
-            int idx = kv.second;
+            const int idx = kv.second;
             if (toLower(rooms[idx].getName()) == t) {
                 player.setCurrentRoom(idx);
-                std::cout << "You move to: " << rooms[idx].getName() << "\n";
-                describeCurrentRoom();
                 return true;
             }
         }
@@ -424,67 +430,66 @@ void Game::runLysaiaPrologue() {
         return false;
     };
 
-hooks.writeJournal = [this](int day) {
-    const int cur = player.getCurrentRoom();
-    const Room& r = rooms[cur];
+    // Write Lysaia’s journal: location entry (if mapped), one-time shrine attempt, guilt beat
+    hooks.writeJournal = [this](int day) {
+        const int cur = player.getCurrentRoom();
+        const Room& r = rooms[cur];
 
-    // Collect candidate location keys (some paths can produce the same key)
-    std::vector<std::string> keys;
-    keys.reserve(3);
+        std::vector<std::string> keys;
+        keys.reserve(3);
 
-    // 1) Room-specific entry (if mapped)
-    if (const std::string loc = toLocationId(r.getName()); !loc.empty()) {
-        keys.push_back(loc);
-    } else {
-        journalManager.writeLysaia("I wrote in an unmarked place, to keep it from becoming strange.");
-    }
-
-    // 2) Shrine attempt entry — first time only, if this room is a shrine
-    if (r.isShrine() && !lysaiaShrinesLogged_.count(cur)) {
-        std::string shrineKey = toLocationId(r.getName()); // try direct mapping first
-        if (shrineKey.empty()) {
-            // derive by deity as fallback
-            switch (deityFromRoomName(r.getName())) {
-                case Deity::Demeter:     shrineKey = "demeter/shrine_uncorrupted"; break;
-                case Deity::Nyx:         shrineKey = "nyx/shrine_uncorrupted"; break;
-                case Deity::Apollo:      shrineKey = "apollo/shrine_uncorrupted"; break;
-                case Deity::Hecate:      shrineKey = "hecate/shrine_uncorrupted"; break;
-                case Deity::Persephone:  shrineKey = "persephone/shrine_uncorrupted"; break;
-                case Deity::Pan:         shrineKey = "pan/shrine_uncorrupted"; break;
-                case Deity::FalseHermes: shrineKey = "false_hermes/shrine_uncorrupted"; break;
-                case Deity::Thanatos:    shrineKey = "thanatos/shrine_uncorrupted"; break;
-                case Deity::Eris:        shrineKey = "eris/shrine_uncorrupted"; break;
-                default: break;
-            }
+        // 1) Room-specific entry (if mapped)
+        if (const std::string loc = toLocationId(r.getName()); !loc.empty()) {
+            keys.push_back(loc);
+        } else {
+            journalManager.writeLysaia("I wrote in an unmarked place, to keep it from becoming strange.");
         }
-        if (!shrineKey.empty()) keys.push_back(shrineKey);
-        lysaiaShrinesLogged_.insert(cur);
-    }
 
-    // 3) Write unique keys only (prevents duplicates)
-    std::sort(keys.begin(), keys.end());
-    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
-    for (const auto& k : keys) {
-        journalManager.writeLysaiaAt(k);
-    }
+        // 2) Shrine attempt entry — first time only, if this room is a shrine
+        if (r.isShrine() && !lysaiaShrinesLogged_.count(cur)) {
+            std::string shrineKey = toLocationId(r.getName()); // try direct map first
+            if (shrineKey.empty()) {
+                switch (deityFromRoomName(r.getName())) {
+                    case Deity::Demeter:     shrineKey = "demeter/shrine_uncorrupted"; break;
+                    case Deity::Nyx:         shrineKey = "nyx/shrine_uncorrupted"; break;
+                    case Deity::Apollo:      shrineKey = "apollo/shrine_uncorrupted"; break;
+                    case Deity::Hecate:      shrineKey = "hecate/shrine_uncorrupted"; break;
+                    case Deity::Persephone:  shrineKey = "persephone/shrine_uncorrupted"; break;
+                    case Deity::Pan:         shrineKey = "pan/shrine_uncorrupted"; break;
+                    case Deity::FalseHermes: shrineKey = "false_hermes/shrine_uncorrupted"; break;
+                    case Deity::Thanatos:    shrineKey = "thanatos/shrine_uncorrupted"; break;
+                    case Deity::Eris:        shrineKey = "eris/shrine_uncorrupted"; break;
+                    default: break;
+                }
+            }
+            if (!shrineKey.empty()) keys.push_back(shrineKey);
+            lysaiaShrinesLogged_.insert(cur);
+        }
 
-    // 4) Day-specific guilt beat
-    journalManager.writeLysaiaGuiltBeat(day);
+        // 3) Unique-only writes
+        std::sort(keys.begin(), keys.end());
+        keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+        for (const auto& k : keys) journalManager.writeLysaiaAt(k);
 
-    std::cout << "You light the candle and write. The ink dries in steady lines.\n";
-    journalManager.printLastLysaia(std::cout);
-};
+        // 4) Day-specific guilt beat
+        journalManager.writeLysaiaGuiltBeat(day);
 
+        std::cout << "You light the candle and write. The ink dries in steady lines.\n";
+        journalManager.printLastLysaia(std::cout);
+    };
 
-hooks.showJournal = [this]() {
-    journalManager.printLysaia(std::cout);
-};
+    hooks.showJournal = [this]() {
+        journalManager.printLysaia(std::cout);
+    };
 
-    printLysaiaHelpBanner();
+    hooks.promptPrefix = [this]() -> std::string {
+        std::ostringstream oss;
+        oss << "[" << rooms[player.getCurrentRoom()].getName() << "] > ";
+        return oss.str();
+    };
+
+    // Run exactly once; PrologueController prints banner/day/room/exits.
     PrologueController prologue(hooks);
-    std::cin.clear();
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
     prologue.run();
 }
 
