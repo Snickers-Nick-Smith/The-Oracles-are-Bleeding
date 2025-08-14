@@ -53,8 +53,7 @@ static const char* kGenericHallucinations[] = {
 
 
 // ---- Helpers ----------------------------------------------------------------
-// If your JournalEntry uses a different field name than `actual`,
-// change the return line below to e.text or e.content, etc.
+// JournalEntry uses `content`
 static inline const std::string& getText(const JournalEntry& e) {
     return e.content;
 }
@@ -67,8 +66,6 @@ void JournalManager::defineLocationEntry(const std::string& id,
     locationEntries[id] = EntryData{actual, hallucination};
 }
 
-// Optional: keep as-is if you already have this elsewhere.
-// Loads the uncorrupted prologue lines + guilt beats.
 void JournalManager::seedLysaiaPrologueText() {
     // Shrine attempts (uncorrupted)
     locationEntries["demeter/shrine_uncorrupted"]     = {"I brought offerings to Demeter and spoke plainly: feed what I starved. The grain did not bow. I bowed instead.", ""};
@@ -103,7 +100,7 @@ void JournalManager::writeLysaiaGuiltBeat(int day) {
 
 void JournalManager::writeLysaia(const std::string& entry) {
     JournalEntry je{};
-    je.content = entry;                 // <-- change if your text field is named differently
+    je.content = entry;                
     lysaiaEntries.emplace_back(std::move(je));
 }
 
@@ -213,9 +210,9 @@ void JournalManager::loadDefaultLocationEntries() {
     "No candles were lit when I entered, but one flared to life... then another, without my touch.",
     "Each flame pretended to warm me, but their light only deepened the cold.");
     
-    defineLocationEntry("thanatos/room/waiting_room",
-    "The chairs faced me in silent expectation; I could not bring myself to sit.",
-    "Every chair knew my weight before I placed it there.");
+    defineLocationEntry("thanatos/room/bloodclock",
+    "A massive pendulum drips red into an unseen basin. It beats steadily—too slowly to match your pulse. On the wall: ■ν α■µατι χρ■νου. ('In the blood of time.')",
+    "The pendulum sways faster when you look away. The drops fall in pairs, like eyes closing.");
 
     defineLocationEntry("thanatos/shrine",
         "I stood beside the bed and counted laurel leaves.",

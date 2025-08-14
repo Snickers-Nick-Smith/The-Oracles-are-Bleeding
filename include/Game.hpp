@@ -55,6 +55,7 @@ private:
     void handleCommand(const std::string& input);
     void toggleAccessibility();
     void showMap();
+    bool firstFramePrinted_ = false;
 
     // ===== Helpers =====
     // deity inference
