@@ -154,8 +154,8 @@ static InteractionContext MakeCtx() {
     };
 }
 
-static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {}
-static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {}
+[[maybe_unused]] static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {}
+[[maybe_unused]] static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {}
 
 
 // ---- Public-ish helpers you will call from your flow ------------------------
@@ -1014,5 +1014,3 @@ void Game::gameLoop() {
     }
 }
 
-[[maybe_unused]] static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {}
-[[maybe_unused]] static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {}
