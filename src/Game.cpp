@@ -964,3 +964,4 @@ void Game::gameLoop() {
         describeCurrentRoom();
         firstFramePrinted_ = true;
     }
+}
