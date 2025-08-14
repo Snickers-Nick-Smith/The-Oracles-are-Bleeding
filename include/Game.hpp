@@ -56,6 +56,9 @@ private:
     void toggleAccessibility();
     void showMap();
     bool firstFramePrinted_ = false;
+    int lastEnteredRoom_ = -1;   // <--- NEW: which room we last "entered" for side-effects
+    // ...
+
 
     // ===== Helpers =====
     // deity inference

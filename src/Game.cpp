@@ -13,6 +13,7 @@
 #include "prologueController.hpp" 
 #include <unordered_map>
 #include <iostream>
+#include <limits>
 #include <algorithm>
 #include <ctime>
 #include <cctype>
@@ -170,24 +171,28 @@ static void InitMechanics(JournalManager* jm, bool isMelasPlaythrough) {
 static void OnRoomEntered(const std::string& roomTitle) {
     auto ctx = MakeCtx();
 
-    // Persephone letter fragment auto-pickups (Melas only)
+    // Persephone fragments (Melas only)
     CheckPersephoneLetterPickupsForRoom(ctx, roomTitle);
 
-    // --- NEW: journal an entry for Melas upon first entering any room ---
+    // Journal auto-log for Melas on first entry to each room
     if (ctx.view == WorldView::Corrupted && g_journal.jm) {
-        if (const std::string loc = toLocationId(roomTitle); !loc.empty()) {
-            // de-dupe using flags map; no header changes needed
-            const std::string flagKey = std::string("visited:") + loc;
-            if (!g_flags[flagKey]) {
-                g_flags[flagKey] = true;
-                g_journal.jm->writeMelasAt(loc);
-            }
-        } else {
-            // Fallback line for unmapped rooms (won’t spam due to flag)
-            const std::string flagKey = std::string("visited:raw:") + roomTitle;
-            if (!g_flags[flagKey]) {
-                g_flags[flagKey] = true;
-                g_journal.writeMelas("I stepped into an unnamed place. The walls remembered before I did.");
+        // Try mapped key first
+        std::string key = toLocationId(roomTitle);
+        // If unmapped, synthesize a safe key from the raw title
+        if (key.empty()) {
+            key = "m/" + toLower(roomTitle);          // e.g., m/the bloodclock
+            std::replace(key.begin(), key.end(), ' ', '_');
+        }
+
+        const std::string flagKey = "visited:" + key;
+        if (!g_flags[flagKey]) {
+            g_flags[flagKey] = true;
+            // Prefer mapped write; if we synthesized, write a generic line too
+            if (toLocationId(roomTitle).empty()) {
+                g_journal.writeMelas("I stepped into " + roomTitle +
+                                     ". The place knew me; I was slower to return the favor.");
+            } else {
+                g_journal.jm->writeMelasAt(key);
             }
         }
     }
@@ -344,13 +349,18 @@ static std::string toLocationId(const std::string& roomName) {
 // Room Descriptor
 void Game::describeCurrentRoom() {
     const int id = player.getCurrentRoom();
-    const Room& current = rooms[id];  
-    OnRoomEntered(current.getName());
+    const Room& current = rooms[id];
 
-    // Color the room description based on deity
+    // Fire mechanics/journal pick-ups ONLY when we've actually moved into a new room.
+    if (id != lastEnteredRoom_) {
+        OnRoomEntered(current.getName());
+        lastEnteredRoom_ = id;
+    }
+
+    // Show the room text every time (look, movement, first frame, etc.)
     printRoomDescriptionColored(current, current.getDescription());
 
-    // (Optional) list visible exits
+    // Exits (unchanged)
     auto it = roomConnections.find(id);
     if (it != roomConnections.end() && !it->second.empty()) {
         std::vector<std::string> exits;
@@ -490,6 +500,7 @@ void Game::startLysaiaPrologue() {
     rooms.clear();
     shrineRegistry.clear();
     roomConnections.clear();
+    lastEnteredRoom_ = -1; 
 
     // ===== Main Hall =====
     rooms.push_back(Room(
@@ -617,7 +628,7 @@ void Game::startLysaiaPrologue() {
 void Game::beginMelasRun() {
     SceneManager::introScene();
 
-    // Flush any leftover input from the intro scene
+    // Flush any leftover input before the game loop uses getline()
     std::cin.clear();
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
@@ -630,22 +641,34 @@ void Game::beginMelasRun() {
 
 
 void Game::displayMainMenu() {
-    int choice;
-    do {
-        std::cout << "\n==== THE ORACLES ARE BLEEDING ====\n";
-        std::cout << "1. Begin Descent\n";
-        std::cout << "2. Accessibility Options\n";
-        std::cout << "3. View Temple Map\n";
-        std::cout << "4. Exit\n";
-        std::cout << "Choice: ";
+    isRunning = true;
 
-        if (!(std::cin >> choice)) {
+    while (isRunning) {
+        std::cout << "\n==== THE ORACLES ARE BLEEDING ====\n"
+                  << "1. Begin Descent\n"
+                  << "2. Accessibility Options\n"
+                  << "3. View Temple Map\n"
+                  << "4. Exit\n"
+                  << "Choice: " << std::flush;
+
+        std::string line;
+        if (!std::getline(std::cin, line)) {
             std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             continue;
         }
-        // flush trailing newline so gameLoop's getline() works
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        // trim quick-n-dirty
+        auto trim = [](std::string s){
+            while (!s.empty() && (s.back()==' '||s.back()=='\t'||s.back()=='\r')) s.pop_back();
+            size_t i=0; while (i<s.size() && (s[i]==' '||s[i]=='\t')) ++i;
+            return s.substr(i);
+        };
+        line = trim(line);
+
+        int choice = 0;
+        if (!line.empty()) {
+            try { choice = std::stoi(line); } catch (...) { choice = 0; }
+        }
 
         switch (choice) {
             case 1:
@@ -663,7 +686,7 @@ void Game::displayMainMenu() {
             default:
                 std::cout << "The gods do not understand that choice.\n";
         }
-    } while (isRunning);
+    }
 }
 
 
@@ -683,9 +706,8 @@ void Game::start() {
 void Game::loadRooms() {
     rooms.clear();
     shrineRegistry.clear();
-
     roomConnections.clear();
-
+    lastEnteredRoom_ = -1;  
     // ===== Main Hall =====
     rooms.push_back(Room(
         "Main Hall of the Temple",
@@ -969,10 +991,28 @@ void Game::toggleAccessibility() {
               << ", Shake: " << (accessibility_.screenShakeEnabled ? "ON" : "OFF") << "\n";
 }
 
+// ===== PATCH 5: print-once loop stays; minor safety flush =====
 void Game::gameLoop() {
     isRunning = true;
+
     if (!firstFramePrinted_) {
         describeCurrentRoom();
         firstFramePrinted_ = true;
     }
+
+    while (isRunning) {
+        std::cout << "\n> " << std::flush;
+        std::string line;
+        if (!std::getline(std::cin, line)) break;
+
+        if (line == "exit" || line == "quit") {
+            isRunning = false;
+            break;
+        }
+
+        handleCommand(line);
+    }
 }
+
+[[maybe_unused]] static void SyncFromGamePlayer(const Player& /*p*/, PlayerState& /*s*/) {}
+[[maybe_unused]] static void SyncToGamePlayer(const PlayerState& /*s*/, Player& /*p*/) {}
