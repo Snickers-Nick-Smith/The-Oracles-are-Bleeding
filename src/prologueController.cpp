@@ -30,6 +30,7 @@ void PrologueController::run() {
         printPrologueHelpBanner();   // <- show once at the beginning
     }
         hooks_.describe();
+        hooks_.listExits();
 
         bool wrote = false, endDay = false;
         while (!endDay) {

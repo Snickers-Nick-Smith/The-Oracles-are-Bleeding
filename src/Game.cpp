@@ -489,7 +489,6 @@ hooks.showJournal = [this]() {
 };
 
 printLysaiaHelpBanner();
-describeCurrentRoom();
     PrologueController prologue(hooks);
     std::cin.clear();
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
