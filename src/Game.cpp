@@ -88,7 +88,7 @@ Deity Game::deityFromRoomName(const std::string& roomName) const {
         {"room of waiting lights",     Deity::Thanatos},
         {"the room of waiting lights", Deity::Thanatos},
         {"waiting room",               Deity::Thanatos},
-        {"the bloodclock",           Deity::Thanatos},
+        {"the bloodclock",             Deity::Thanatos},
         {"sleepwalker’s alcove",       Deity::Thanatos},  // corrupted shrine
         {"hall of quiet rest",         Deity::Thanatos},  // uncorrupted shrine
 
@@ -110,16 +110,6 @@ Deity Game::deityFromRoomName(const std::string& roomName) const {
 
 static std::string toLocationId(const std::string& roomName);
 
-static void printLysaiaHelpBanner() {
-    std::cout
-        << "\n— Lysaia’s Prologue —\n"
-        << "Commands:\n"
-        << "  look / look around      reprint the room\n"
-        << "  exits                   list available directions\n"
-        << "  n,s,e,w,ne,nw,se,sw,u,d or go/move <dir>\n"
-        << "  journal                 read your entries\n"
-        << "  help                    show commands\n";
-}
 // =================== Mechanics Integration Bridge ============================
 static RNG                     g_rng;
 static PlayerState             g_pstate;
@@ -181,31 +171,19 @@ static void InitMechanics(JournalManager* jm, bool isMelasPlaythrough) {
 static void OnRoomEntered(const std::string& roomTitle) {
     auto ctx = MakeCtx();
 
-    // Persephone fragments (Melas only)
-    CheckPersephoneLetterPickupsForRoom(ctx, roomTitle);
-
-    // Journal auto-log for Melas on first entry to each room
+    // --- MELAS: auto-write a location entry once per room visit ---
     if (ctx.view == WorldView::Corrupted && g_journal.jm) {
-        // Try mapped key first
-        std::string key = toLocationId(roomTitle);
-        // If unmapped, synthesize a safe key from the raw title
-        if (key.empty()) {
-            key = "m/" + toLower(roomTitle);          // e.g., m/the bloodclock
-            std::replace(key.begin(), key.end(), ' ', '_');
-        }
-
-        const std::string flagKey = "visited:" + key;
-        if (!g_flags[flagKey]) {
-            g_flags[flagKey] = true;
-            // Prefer mapped write; if we synthesized, write a generic line too
-            if (toLocationId(roomTitle).empty()) {
-                g_journal.writeMelas("I stepped into " + roomTitle +
-                                     ". The place knew me; I was slower to return the favor.");
-            } else {
-                g_journal.jm->writeMelasAt(key);
+        if (const std::string loc = toLocationId(roomTitle); !loc.empty()) {
+            const std::string flag = "melas_visited:" + loc;
+            if (!g_flags[flag]) {
+                g_journal.jm->writeMelasAt(loc); // add location entry
+                g_flags[flag] = true;            // de-dupe for future revisits
             }
         }
     }
+
+    // Persephone letter fragment auto-pickups (already Melas-only inside)
+    CheckPersephoneLetterPickupsForRoom(ctx, roomTitle);
 }
 
 static void OnShrineInteract(const Shrine& shrine, JournalManager* /* jm */) {
@@ -253,6 +231,117 @@ void Game::printShrineText(const Shrine& shrine,
     }
 }
 
+// --- lookup & wiring helpers ---
+int Game::indexByTitle(const std::string& title) const {
+    for (int i = 0; i < static_cast<int>(rooms.size()); ++i)
+        if (rooms[i].getName() == title) return i;
+    return -1;
+}
+
+void Game::addEdge(int from, const std::string& dirLong, int to) {
+    const std::string longKey = normalize_dir(dirLong); // "n" -> "north"
+    roomConnections[from][longKey] = to;                // store only long key
+}
+
+
+void Game::addEdgeByTitle(const std::string& fromTitle, const std::string& dirLong,
+                          const std::string& toTitle) {
+    const int from = indexByTitle(fromTitle);
+    const int to   = indexByTitle(toTitle);
+    if (from < 0 || to < 0) return; // or assert/log
+    addEdge(from, dirLong, to);
+}
+
+void Game::addEdgeBothByTitle(const std::string& fromTitle, const std::string& dirLong,
+                              const std::string& toTitle,   const std::string& reverseDirLong) {
+    addEdgeByTitle(fromTitle, dirLong, toTitle);
+    addEdgeByTitle(toTitle, reverseDirLong, fromTitle);
+}
+
+void Game::setupPrologueConnectionsByTitle() {
+    roomConnections.clear();
+
+    const std::string MH = "Main Hall of the Temple";
+
+    // Main Hall spokes
+    addEdgeByTitle(MH, "north",     "Garden of Blooming Faces");   // Demeter entry
+    addEdgeByTitle(MH, "northeast", "Room of Gentle Horizons");    // Nyx entry
+    addEdgeByTitle(MH, "east",      "Hall of Echoes");             // Apollo entry
+    addEdgeByTitle(MH, "southeast", "Loom of Names");              // Hecate entry
+    addEdgeByTitle(MH, "south",     "Hall of Petals");             // Persephone entry
+    addEdgeByTitle(MH, "southwest", "Hall of Living Wood");        // Pan entry
+    addEdgeByTitle(MH, "west",      "Room of Borrowed Things");    // False Hermes entry
+    addEdgeByTitle(MH, "northwest", "Room of Waiting Lights");     // Thanatos entry
+    addEdgeByTitle(MH, "up",        "Throat of the Temple");       // Eris entry
+
+    // Quick return to Main Hall from each room in a wing (matches your index layout)
+    addEdgeByTitle("Garden of Blooming Faces", "south", MH);
+    addEdgeByTitle("Threaded Womb",            "south", MH);
+    addEdgeByTitle("Hall of Plenty",           "south", MH);
+
+    addEdgeByTitle("Room of Gentle Horizons",  "southwest", MH);
+    addEdgeByTitle("Nest of Wings",            "southwest", MH);
+    addEdgeByTitle("The Star-Bound Well",      "southwest", MH);
+
+    addEdgeByTitle("Hall of Echoes",           "west", MH);
+    addEdgeByTitle("Room That Remembers",      "west", MH);
+    addEdgeByTitle("Echoing Gallery",          "west", MH);
+
+    addEdgeByTitle("Loom of Names",            "northwest", MH);
+    addEdgeByTitle("Listening Chamber",        "northwest", MH);
+    addEdgeByTitle("The Luminous Path",        "northwest", MH);
+
+    addEdgeByTitle("Hall of Petals",           "north", MH);
+    addEdgeByTitle("Orchard Walk",             "north", MH);
+    addEdgeByTitle("The Blooming Spring",      "north", MH);
+
+    addEdgeByTitle("Hall of Living Wood",      "northeast", MH);
+    addEdgeByTitle("Den of Antlers",           "northeast", MH);
+    addEdgeByTitle("Verdant Rotunda",          "northeast", MH);
+
+    addEdgeByTitle("Room of Borrowed Things",  "north", MH);
+    addEdgeByTitle("Whispering Hall",          "north", MH);
+    addEdgeByTitle("Gilded Hallway",           "north", MH);
+
+    addEdgeByTitle("Room of Waiting Lights",   "southeast", MH);
+    addEdgeByTitle("Waiting Room",             "southeast", MH);
+    addEdgeByTitle("Hall of Quiet Rest",       "southeast", MH);
+
+    addEdgeByTitle("Throat of the Temple",     "down", MH);
+    addEdgeByTitle("Oracle’s Wake",            "down", MH);
+    addEdgeByTitle("Archivist’s Cell",         "down", MH);
+    addEdgeByTitle("Hall of Harmony",          "down", MH);
+
+    // Linear paths inside each wing (bidirectional)
+    addEdgeBothByTitle("Garden of Blooming Faces", "east", "Threaded Womb", "west");
+    addEdgeBothByTitle("Threaded Womb",            "east", "Hall of Plenty", "west");
+
+    addEdgeBothByTitle("Room of Gentle Horizons",  "east", "Nest of Wings", "west");
+    addEdgeBothByTitle("Nest of Wings",            "east", "The Star-Bound Well", "west");
+
+    addEdgeBothByTitle("Hall of Echoes",           "east", "Room That Remembers", "west");
+    addEdgeBothByTitle("Room That Remembers",      "east", "Echoing Gallery", "west");
+
+    addEdgeBothByTitle("Loom of Names",            "east", "Listening Chamber", "west");
+    addEdgeBothByTitle("Listening Chamber",        "east", "The Luminous Path", "west");
+
+    addEdgeBothByTitle("Hall of Petals",           "east", "Orchard Walk", "west");
+    addEdgeBothByTitle("Orchard Walk",             "east", "The Blooming Spring", "west");
+
+    addEdgeBothByTitle("Hall of Living Wood",      "east", "Den of Antlers", "west");
+    addEdgeBothByTitle("Den of Antlers",           "east", "Verdant Rotunda", "west");
+
+    addEdgeBothByTitle("Room of Borrowed Things",  "east", "Whispering Hall", "west");
+    addEdgeBothByTitle("Whispering Hall",          "east", "Gilded Hallway", "west");
+
+    addEdgeBothByTitle("Room of Waiting Lights",   "east", "Waiting Room", "west");
+    addEdgeBothByTitle("Waiting Room",             "east", "Hall of Quiet Rest", "west");
+
+    addEdgeBothByTitle("Throat of the Temple",     "east", "Oracle’s Wake", "west");
+    addEdgeBothByTitle("Oracle’s Wake",            "east", "Archivist’s Cell", "west");
+    addEdgeBothByTitle("Archivist’s Cell",         "east", "Hall of Harmony", "west");
+}
+
 // Color a room description line using its deity (if we can infer one).
 void Game::printRoomDescriptionColored(const Room& room,
                                        const std::string& description) {
@@ -291,86 +380,92 @@ static std::string toLocationId(const std::string& roomName) {
     static const std::unordered_map<std::string, std::string> kRoomToLocId = {
         // ===== Demeter =====
         {"The Garden of Broken Faces", "demeter/room/garden_of_broken_faces"},
-        {"The Threadbare Womb",       "demeter/room/threadbare_womb"},
-        {"The Hall of Hunger",        "demeter/shrine"},
-        {"Garden of Blooming Faces",  "demeter/room/garden_of_blooming_faces"}, // new
-        {"Threaded Womb",             "demeter/room/threaded_womb"},            // new
-        {"Hall of Plenty",            "demeter/shrine_uncorrupted"},            // new (use your preferred id)
+        {"The Threadbare Womb",        "demeter/room/threadbare_womb"},
+        {"The Hall of Hunger",         "demeter/shrine"},
+        {"Garden of Blooming Faces",   "demeter/room/garden_of_blooming_faces"},
+        {"Threaded Womb",              "demeter/room/threaded_womb"},
+        {"Hall of Plenty",             "demeter/shrine_uncorrupted"},
 
         // ===== Nyx =====
-        {"Room With No Corners",      "nyx/room/no_corners"},
-        {"Nest of Wings",             "nyx/room/nest_of_wings"},
-        {"The Starless Well",         "nyx/shrine"},
-        {"Room of Gentle Horizons",   "nyx/room/gentle_horizons"},              // new
-        {"The Star-Bound Well",       "nyx/shrine_uncorrupted"},                // new
+        {"Room With No Corners",       "nyx/room/no_corners"},
+        {"Nest of Wings",              "nyx/room/nest_of_wings"},
+        {"The Starless Well",          "nyx/shrine"},
+        {"Room of Gentle Horizons",    "nyx/room/gentle_horizons"},
+        {"The Star-Bound Well",        "nyx/shrine_uncorrupted"},
 
         // ===== Apollo =====
-        {"Hall of Echoes",            "apollo/room/hall_of_echoes"},
-        {"Room That Remembers",       "apollo/room/room_that_remembers"},
-        {"Echoing Gallery",           "apollo/shrine"},
+        {"Hall of Echoes",             "apollo/room/hall_of_echoes"},
+        {"Room That Remembers",        "apollo/room/room_that_remembers"},
+        {"Echoing Gallery",            "apollo/shrine_uncorrupted"}, // FIX: single uncorrupted entry
 
         // ===== Hecate =====
-        {"Loom of Names",             "hecate/room/loom_of_names"},
-        {"Listening Chamber",         "hecate/room/listening_chamber"},
-        {"The Unlit Path",            "hecate/shrine"},
-        {"The Luminous Path",         "hecate/shrine_uncorrupted"},             // new
+        {"Loom of Names",              "hecate/room/loom_of_names"},
+        {"Listening Chamber",          "hecate/room/listening_chamber"},
+        {"The Unlit Path",             "hecate/shrine"},
+        {"The Luminous Path",          "hecate/shrine_uncorrupted"},
 
         // ===== Persephone =====
-        {"Hall of Petals",            "persephone/room/hall_of_petals"},
-        {"Orchard Walk",              "persephone/room/orchard_walk"},
-        {"The Frozen Spring",         "persephone/shrine"},
-        {"The Blooming Spring",       "persephone/shrine_uncorrupted"},         // new
+        {"Hall of Petals",             "persephone/room/hall_of_petals"},
+        {"Orchard Walk",               "persephone/room/orchard_walk"},
+        {"The Frozen Spring",          "persephone/shrine"},
+        {"The Blooming Spring",        "persephone/shrine_uncorrupted"},
 
         // ===== Pan =====
-        {"Hall of Shivering Meat",    "pan/room/hall_of_shivering_meat"},
-        {"Den of Antlers",            "pan/room/den_of_antlers"},
-        {"Wild Rotunda",              "pan/shrine"},
-        {"Hall of Living Wood",       "pan/room/hall_of_living_wood"},          // new
-        {"Verdant Rotunda",           "pan/shrine_uncorrupted"},                // new
+        {"Hall of Shivering Meat",     "pan/room/hall_of_shivering_meat"},
+        {"Den of Antlers",             "pan/room/den_of_antlers"},
+        {"Wild Rotunda",               "pan/shrine"},
+        {"Hall of Living Wood",        "pan/room/hall_of_living_wood"},
+        {"Verdant Rotunda",            "pan/shrine_uncorrupted"},
 
         // ===== False Hermes =====
-        {"Room of Borrowed Things",   "false_hermes/room/borrowed_things"},
-        {"Whispering Hall",           "false_hermes/room/whispering_hall"},
-        {"Gilded Hallway",            "false_hermes/shrine"},
+        {"Room of Borrowed Things",    "false_hermes/room/borrowed_things"},
+        {"Whispering Hall",            "false_hermes/room/whispering_hall"},
+        {"Gilded Hallway",             "false_hermes/shrine_uncorrupted"}, // FIX: correct key; remove typo line
 
         // ===== Thanatos =====
-        {"Room of Waiting Lights",    "thanatos/room/room_of_waiting_lights"},
-        {"The Room of Waiting Lights","thanatos/room/room_of_waiting_lights"},
-        {"Waiting Room",              "thanatos/room/waiting_room"},
-        {"The Bloodclock",            "thanatos/room/bloodclock"},
-        {"Sleepwalker’s Alcove",      "thanatos/shrine"},
-        {"Hall of Quiet Rest",        "thanatos/shrine_uncorrupted"},           // new
+        {"Room of Waiting Lights",     "thanatos/room/room_of_waiting_lights"},
+        {"The Room of Waiting Lights", "thanatos/room/room_of_waiting_lights"},
+        {"Waiting Room",               "thanatos/room/waiting_room"},
+        {"The Bloodclock",             "thanatos/room/bloodclock"},
+        {"Sleepwalker’s Alcove",       "thanatos/shrine"},
+        {"Hall of Quiet Rest",         "thanatos/shrine_uncorrupted"},
 
         // ===== Eris =====
-        {"Oracle’s Wake",             "eris/room/oracles_wake"},
-        {"Archivist’s Cell",          "eris/room/archivists_cell"},
-        {"Throat of the Temple",      "eris/room/throat_of_temple"},
-        {"The Bone Choir",            "eris/shrine"},
-        {"Hall of Harmony",           "eris/shrine_uncorrupted"},               // new
+        {"Oracle’s Wake",              "eris/room/oracles_wake"},
+        {"Archivist’s Cell",           "eris/room/archivists_cell"},
+        {"Throat of the Temple",       "eris/room/throat_of_temple"},
+        {"The Bone Choir",             "eris/shrine"},
+        {"Hall of Harmony",            "eris/shrine_uncorrupted"},
 
         // ===== Hub =====
-        {"Main Hall of the Temple",   ""}
+        {"Main Hall of the Temple",    ""}
     };
 
     auto it = kRoomToLocId.find(roomName);
     return (it != kRoomToLocId.end()) ? it->second : std::string{};
 }
 
+
 // Room Descriptor
 void Game::describeCurrentRoom() {
+    // Gate: allow rendering if we're InGame OR we're in the prologue
+    if (!inPrologue_ && phase_ != Phase::InGame) return;
+
     const int id = player.getCurrentRoom();
+    if (id < 0 || id >= static_cast<int>(rooms.size())) return;
+
     const Room& current = rooms[id];
 
-    // Fire mechanics/journal pick-ups ONLY when we've actually moved into a new room.
-    if (id != lastEnteredRoom_) {
-        OnRoomEntered(current.getName());
+    // Only fire Melas mechanics/journal when actually in the main run.
+    if (!inPrologue_ && id != lastEnteredRoom_) {
+        OnRoomEntered(current.getName());   // or OnRoomEntered(id);
         lastEnteredRoom_ = id;
     }
 
-    // Show the room text every time (look, movement, first frame, etc.)
+    // Print the room description once
     printRoomDescriptionColored(current, current.getDescription());
 
-    // Exits (unchanged)
+    // Exits
     auto it = roomConnections.find(id);
     if (it != roomConnections.end() && !it->second.empty()) {
         std::vector<std::string> exits;
@@ -381,123 +476,149 @@ void Game::describeCurrentRoom() {
     }
 }
 
+
+
 void Game::runLysaiaPrologue() {
+     inPrologue_ = true;  
+     phase_      = Phase::Intro;
     PrologueController::Hooks hooks;
 
-    // Show the current room (OnRoomEntered fires only on true entry; your lastEnteredRoom_ guard handles spam)
     hooks.describe = [this]() {
-        describeCurrentRoom();
+        describeCurrentRoom(); // prints room (and exits if your describe() does)
     };
 
-    // List exits from the current room
-    hooks.listExits = [this]() {
-        const int cur = player.getCurrentRoom();
-        auto it = roomConnections.find(cur);
-        if (it == roomConnections.end() || it->second.empty()) {
-            std::cout << "No obvious exits.\n";
-            return;
-        }
-        std::vector<std::string> dirs;
-        dirs.reserve(it->second.size());
-        for (const auto& kv : it->second) dirs.push_back(kv.first);
-        std::sort(dirs.begin(), dirs.end());
-        std::cout << "Exits: " << join(dirs, ", ") << "\n";
-    };
+   hooks.listExits = [this]() {
+    const int cur = player.getCurrentRoom();
+    auto it = roomConnections.find(cur);
+    if (it == roomConnections.end() || it->second.empty()) { std::cout << "No obvious exits.\n"; return; }
 
-    // Move by direction token or by visible neighbor room title. DO NOT print here; return true if moved.
-    hooks.moveTo = [this](const std::string& target) -> bool {
-        // direction?
-        if (auto dir = normalize_dir(target); !dir.empty()) {
-            player.move(dir, roomConnections);
-            return true;
-        }
-        // neighbor title?
+    std::vector<std::string> longs;
+    longs.reserve(it->second.size());
+    for (const auto& kv : it->second) longs.push_back(kv.first);
+    std::sort(longs.begin(), longs.end());
+    longs.erase(std::unique(longs.begin(), longs.end()), longs.end());
+    std::cout << "Exits: " << join(longs, ", ") << "\n";
+};
+
+   hooks.moveTo = [this](const std::string& target) -> bool {
+    if (auto dir = normalize_dir(target); !dir.empty()) {
         const int cur = player.getCurrentRoom();
         auto it = roomConnections.find(cur);
-        if (it == roomConnections.end()) {
-            std::cout << "You can’t move from here.\n";
-            return false;
-        }
-        const std::string t = toLower(target);
-        for (const auto& kv : it->second) {
-            const int idx = kv.second;
-            if (toLower(rooms[idx].getName()) == t) {
-                player.setCurrentRoom(idx);
-                return true;
+        if (it == roomConnections.end()) { std::cout << "You can't move from here.\n"; return false; }
+
+        // resolve direction to a stored key (long or short)
+        auto jt = it->second.find(dir);
+        if (jt == it->second.end()) {
+            // try normalized alias
+            for (const auto& kv : it->second) {
+                if (normalize_dir(kv.first) == dir) { jt = it->second.find(kv.first); break; }
             }
         }
-        std::cout << "No path to '" << target << "'. Try 'exits'.\n";
-        return false;
+        if (jt == it->second.end()) { std::cout << "No exit that way.\n"; return false; }
+
+        // perform move (Player::move prints its own “No exit” if needed)
+        player.move(jt->first, roomConnections);
+
+        // DO NOT describe here; controller will call hooks.describe() after success
+        return true;
+    }
+
+    // room-name teleport among neighbors
+    const int cur = player.getCurrentRoom();
+    auto it = roomConnections.find(cur);
+    if (it == roomConnections.end()) { std::cout << "You can't move from here.\n"; return false; }
+
+    const std::string t = toLower(target);
+    for (const auto& kv : it->second) {
+        const int idx = kv.second;
+        if (toLower(rooms[idx].getName()) == t) {
+            player.setCurrentRoom(idx);
+            return true;
+        }
+    }
+    std::cout << "No path to '" << target << "'. Try 'exits'.\n";
+    return false;
+};
+
+   hooks.writeJournal = [this](int day) {
+    const int cur = player.getCurrentRoom();
+    const Room& r = rooms[cur];
+
+    // Local helper that has access to 'this' (so we can call the private member)
+    auto shrineKeyForLysaia = [this](const Room& room) -> std::string {
+        switch (deityFromRoomName(room.getName())) {
+            case Deity::Demeter:     return "demeter/shrine_uncorrupted";
+            case Deity::Nyx:         return "nyx/shrine_uncorrupted";
+            case Deity::Apollo:      return "apollo/shrine_uncorrupted";
+            case Deity::Hecate:      return "hecate/shrine_uncorrupted";
+            case Deity::Persephone:  return "persephone/shrine_uncorrupted";
+            case Deity::Pan:         return "pan/shrine_uncorrupted";
+            case Deity::FalseHermes: return "false_hermes/shrine_uncorrupted";
+            case Deity::Thanatos:    return "thanatos/shrine_uncorrupted";
+            case Deity::Eris:        return "eris/shrine_uncorrupted";
+            default:                 return std::string{};
+        }
     };
 
-    // Write Lysaia’s journal: location entry (if mapped), one-time shrine attempt, guilt beat
-    hooks.writeJournal = [this](int day) {
-        const int cur = player.getCurrentRoom();
-        const Room& r = rooms[cur];
+    std::vector<std::string> keys;
+    keys.reserve(2);
 
-        std::vector<std::string> keys;
-        keys.reserve(3);
+    if (r.isShrine()) {
+        // Prefer explicit room mapping; fall back by deity if missing/wrong
+        std::string key = toLocationId(r.getName());
+        if (key.empty() || key.find("/shrine") == std::string::npos) {
+            key = shrineKeyForLysaia(r);
+        }
+        if (!key.empty()) keys.push_back(key);
 
-        // 1) Room-specific entry (if mapped)
+        // If you want “first time at this shrine” gating, keep your set:
+        // if (!lysaiaShrinesLogged_.count(cur)) lysaiaShrinesLogged_.insert(cur);
+    } else {
         if (const std::string loc = toLocationId(r.getName()); !loc.empty()) {
             keys.push_back(loc);
         } else {
-            journalManager.writeLysaia("I wrote in an unmarked place, to keep it from becoming strange.");
+            journalManager.writeLysaia(
+                "I wrote in an unmarked place, to keep it from becoming strange.");
         }
+    }
 
-        // 2) Shrine attempt entry — first time only, if this room is a shrine
-        if (r.isShrine() && !lysaiaShrinesLogged_.count(cur)) {
-            std::string shrineKey = toLocationId(r.getName()); // try direct map first
-            if (shrineKey.empty()) {
-                switch (deityFromRoomName(r.getName())) {
-                    case Deity::Demeter:     shrineKey = "demeter/shrine_uncorrupted"; break;
-                    case Deity::Nyx:         shrineKey = "nyx/shrine_uncorrupted"; break;
-                    case Deity::Apollo:      shrineKey = "apollo/shrine_uncorrupted"; break;
-                    case Deity::Hecate:      shrineKey = "hecate/shrine_uncorrupted"; break;
-                    case Deity::Persephone:  shrineKey = "persephone/shrine_uncorrupted"; break;
-                    case Deity::Pan:         shrineKey = "pan/shrine_uncorrupted"; break;
-                    case Deity::FalseHermes: shrineKey = "false_hermes/shrine_uncorrupted"; break;
-                    case Deity::Thanatos:    shrineKey = "thanatos/shrine_uncorrupted"; break;
-                    case Deity::Eris:        shrineKey = "eris/shrine_uncorrupted"; break;
-                    default: break;
-                }
-            }
-            if (!shrineKey.empty()) keys.push_back(shrineKey);
-            lysaiaShrinesLogged_.insert(cur);
-        }
+    // De-dup and write
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+    for (const auto& k : keys) journalManager.writeLysaiaAt(k);
 
-        // 3) Unique-only writes
-        std::sort(keys.begin(), keys.end());
-        keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
-        for (const auto& k : keys) journalManager.writeLysaiaAt(k);
+    // Day-specific beat
+    journalManager.writeLysaiaGuiltBeat(day);
 
-        // 4) Day-specific guilt beat
-        journalManager.writeLysaiaGuiltBeat(day);
+    std::cout << "You light the candle and write. The ink dries in steady lines.\n";
+    journalManager.printLastLysaia(std::cout);
+};
 
-        std::cout << "You light the candle and write. The ink dries in steady lines.\n";
-        journalManager.printLastLysaia(std::cout);
-    };
 
-    hooks.showJournal = [this]() {
-        journalManager.printLysaia(std::cout);
-    };
 
-    hooks.promptPrefix = [this]() -> std::string {
+
+    hooks.showJournal = [this]() { journalManager.printLysaia(std::cout); };
+
+    hooks.promptPrefix = [this]() {
         std::ostringstream oss;
         oss << "[" << rooms[player.getCurrentRoom()].getName() << "] > ";
         return oss.str();
     };
 
-    // Run exactly once; PrologueController prints banner/day/room/exits.
+    // IMPORTANT: one controller, one run. No pre-describe, no second run.
     PrologueController prologue(hooks);
     prologue.run();
 }
+
+
+
 
 Game::Game() : isRunning(true) {
 }
 
 
 void Game::startLysaiaPrologue() {
+    inPrologue_ = true;  
     ThemeRegistry::setDefaultShrineState(ShrineState::UNCORRUPTED);
 
     InitMechanics(&journalManager, /*isMelasPlaythrough=*/false);
@@ -515,7 +636,7 @@ void Game::startLysaiaPrologue() {
         "Sunlight streams through high windows, casting bright patterns across polished marble. The air is warm, "
         "and the faint sound of lyres drifts from unseen corridors."
     ));
-    player.setCurrentRoom(0);
+    // (temporary start removed; we’ll set start by title later)
 
     // ===== Demeter =====
     Shrine demeter("Demeter", "Hall of Plenty");
@@ -607,7 +728,7 @@ void Game::startLysaiaPrologue() {
     shrineRegistry[7] = thanatos;
     rooms.push_back(Room("Room of Waiting Lights",
         "Lanterns hang in still air, each burning steadily. The silence here is peaceful and complete."));
-    rooms.push_back(Room("The Waiting Room",
+    rooms.push_back(Room("Waiting Room",
         "Cushioned benches face a great window where clouds drift by slowly. A pot of tea sits untouched on a table."));
     rooms.push_back(Room("Hall of Quiet Rest",
         "Tall doors open onto a calm garden where no wind stirs. The only sound is the quiet hum of the earth.", true, 7));
@@ -625,76 +746,133 @@ void Game::startLysaiaPrologue() {
     rooms.push_back(Room("Hall of Harmony",
         "A vaulted chamber filled with soft music and the glow of stained glass. Dust motes drift in the warm light.", true, 8));
 
-    setupConnections();
-    lysaiaShrinesLogged_.clear();
-    lastEnteredRoom_ = -1;
+    player.setCurrentRoom(indexByTitle("Main Hall of the Temple"));
+    setupPrologueConnectionsByTitle();
+    lastEnteredRoom_ = -1; // ensure OnRoomEntered won't suppress first render
+
+    // now run the 7-day loop
     runLysaiaPrologue();
 
+    // wrap up
+    inPrologue_ = false;
+    // phase will be set to MainMenu by your caller before showing menu
+}
+
+
+void Game::syncInputAfterPrologue() {
+    // If the prologue set fail/eof, recover.
+    if (std::cin.fail()) std::cin.clear();
+
+    // If a newline is sitting there, eat exactly one.
+    if (std::cin.peek() == '\n') { std::cin.get(); return; }
+
+    // If there’s buffered junk up to a newline, drain it non-blockingly.
+    // NOTE: rdbuf()->in_avail() may be 0 on TTY; we only ignore when data exists.
+    std::streamsize avail = std::cin.rdbuf()->in_avail();
+    if (avail > 0) {
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
 }
 
 void Game::beginMelasRun() {
     SceneManager::introScene();
-    std::cin.clear();
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    // Fresh state for a clean run
+    g_flags.clear();
+    lastEnteredRoom_ = -1;
+    firstFramePrinted_ = false;
 
     InitMechanics(&journalManager, /*isMelasPlaythrough=*/true);
     ThemeRegistry::setDefaultShrineState(ShrineState::CORRUPTED);
+
     loadRooms();
 
-    firstFramePrinted_ = false;
+    // Do NOT pre-print here; gameLoop will print once and trigger OnRoomEntered
     gameLoop();
+}
+void Game::beginDescent() {
+    phase_ = Phase::Intro;
+
+    printTitleBlock();
+
+    // Your intro text (deliberately blank player name)
+    std::cout
+        << "They gave her a name that was not hers: Cassandra.\n"
+        << "You are _____, a former oracle, cast out.\n"
+        << "Now the temple is open again.\n\n"
+        << "> Press ENTER to descend.\n";
+
+    waitForEnter();
+
+    // After ENTER, we are officially in-game. Print the starting room ONCE.
+    phase_ = Phase::InGame;
+    describeCurrentRoom();
+    firstFramePrinted_ = true;
+}
+void Game::printTitleBlock() {
+    std::cout << "THE ORACLES ARE BLEEDING\n\n";
+}
+
+void Game::waitForEnter() {
+    std::string _;
+    std::getline(std::cin, _);
 }
 
 
 
 void Game::displayMainMenu() {
-    isRunning = true;
+    phase_ = Phase::MainMenu;
 
-    while (isRunning) {
-        std::cout << "\n==== THE ORACLES ARE BLEEDING ====\n"
-                  << "1. Begin Descent\n"
-                  << "2. Accessibility Options\n"
-                  << "3. View Temple Map\n"
-                  << "4. Exit\n"
-                  << "Choice: " << std::flush;
+    for (;;) {
+        std::cout
+            << "==== THE ORACLES ARE BLEEDING ====\n"
+            << "1. Begin Descent\n"
+            << "2. Accessibility Options\n"
+            << "3. View Temple Map\n"
+            << "4. Exit\n"
+            << "Choice: ";
 
-        std::string line;
-        if (!std::getline(std::cin, line)) {
-            std::cin.clear();
-            continue;
+        std::string choice;
+        if (!std::getline(std::cin, choice)) {
+            // Recover from stray EOF/fail and re-prompt
+            if (std::cin.fail() || std::cin.eof()) {
+                std::cin.clear();
+                continue; // redraw menu
+            }
+            return; // truly broken input; exit
         }
 
-        // trim quick-n-dirty
-        auto trim = [](std::string s){
-            while (!s.empty() && (s.back()==' '||s.back()=='\t'||s.back()=='\r')) s.pop_back();
-            size_t i=0; while (i<s.size() && (s[i]==' '||s[i]=='\t')) ++i;
-            return s.substr(i);
-        };
-        line = trim(line);
-
-        int choice = 0;
-        if (!line.empty()) {
-            try { choice = std::stoi(line); } catch (...) { choice = 0; }
+        // normalize to first non-space character
+        char c = 0;
+        for (char ch : choice) {
+            if (!std::isspace(static_cast<unsigned char>(ch))) { c = ch; break; }
         }
 
-        switch (choice) {
-            case 1:
-                beginMelasRun();
-                break;
-            case 2:
-                toggleAccessibility();
-                break;
-            case 3:
-                showMap();
-                break;
-            case 4:
-                isRunning = false;
-                break;
-            default:
-                std::cout << "The gods do not understand that choice.\n";
+        if (c == '1') {
+            beginMelasRun();         // setup only; NO prints
+            lastEnteredRoom_ = -1;
+            firstFramePrinted_ = false;
+
+            beginDescent();          // title + intro; waits for ENTER; calls describe once
+            gameLoop();              // main run loop
+            // when gameLoop returns, fall back to menu (for replays)
+        }
+        else if (c == '2') {
+            toggleAccessibility();
+        }
+        else if (c == '3') {
+            showMap();
+        }
+        else if (c == '4') {
+            return;
+        }
+        else {
+            std::cout << "The gods do not understand that choice.\n";
         }
     }
 }
+
+
 
 
 void Game::showMap() {
@@ -704,10 +882,12 @@ void Game::showMap() {
 }
 
 void Game::start() {
-    // Always run Lysaia first, then land in the main menu.
-    startLysaiaPrologue();
-    displayMainMenu();
+    startLysaiaPrologue();      // plays 7 days and returns
+    syncInputAfterPrologue();   // <-- clear any leftover input/EOF
+    phase_ = Phase::MainMenu;
+    displayMainMenu();          // menu loop
 }
+
 
 
 void Game::loadRooms() {
@@ -802,63 +982,63 @@ void Game::loadRooms() {
 
 void Game::setupConnections() {
     // Main Hall spokes
-    roomConnections[0]["north"]     = 1;   // Demeter start
-    roomConnections[0]["northeast"] = 4;   // Nyx start
-    roomConnections[0]["east"]      = 7;   // Apollo start
-    roomConnections[0]["southeast"] = 10;  // Hecate start
-    roomConnections[0]["south"]     = 13;  // Persephone start
-    roomConnections[0]["southwest"] = 16;  // Pan start
-    roomConnections[0]["west"]      = 19;  // False Hermes start
-    roomConnections[0]["northwest"] = 22;  // Thanatos start
-    roomConnections[0]["up"]        = 25;  // Eris start
+    addEdge(0, "north",     1);
+    addEdge(0, "northeast", 4);
+    addEdge(0, "east",      7);
+    addEdge(0, "southeast", 10);
+    addEdge(0, "south",     13);
+    addEdge(0, "southwest", 16);
+    addEdge(0, "west",      19);
+    addEdge(0, "northwest", 22);
+    addEdge(0, "up",        25);
 
     // Demeter (1–3)
-    roomConnections[1]["east"] = 2; roomConnections[2]["west"] = 1;
-    roomConnections[2]["east"] = 3; roomConnections[3]["west"] = 2;
-    roomConnections[1]["south"] = 0; roomConnections[2]["south"] = 0; roomConnections[3]["south"] = 0;
+    addEdge(1, "east", 2); addEdge(2, "west", 1);
+    addEdge(2, "east", 3); addEdge(3, "west", 2);
+    addEdge(1, "south", 0); addEdge(2, "south", 0); addEdge(3, "south", 0);
 
     // Nyx (4–6)
-    roomConnections[4]["east"] = 5; roomConnections[5]["west"] = 4;
-    roomConnections[5]["east"] = 6; roomConnections[6]["west"] = 5;
-    roomConnections[4]["southwest"] = 0; roomConnections[5]["southwest"] = 0; roomConnections[6]["southwest"] = 0;
+    addEdge(4, "east", 5); addEdge(5, "west", 4);
+    addEdge(5, "east", 6); addEdge(6, "west", 5);
+    addEdge(4, "southwest", 0); addEdge(5, "southwest", 0); addEdge(6, "southwest", 0);
 
     // Apollo (7–9)
-    roomConnections[7]["east"] = 8; roomConnections[8]["west"] = 7;
-    roomConnections[8]["east"] = 9; roomConnections[9]["west"] = 8;
-    roomConnections[7]["west"] = 0; roomConnections[8]["west"] = 0; roomConnections[9]["west"] = 0;
+    addEdge(7, "east", 8); addEdge(8, "west", 7);
+    addEdge(8, "east", 9); addEdge(9, "west", 8);
+    addEdge(7, "west", 0); addEdge(8, "west", 0); addEdge(9, "west", 0);
 
     // Hecate (10–12)
-    roomConnections[10]["east"] = 11; roomConnections[11]["west"] = 10;
-    roomConnections[11]["east"] = 12; roomConnections[12]["west"] = 11;
-    roomConnections[10]["northwest"] = 0; roomConnections[11]["northwest"] = 0; roomConnections[12]["northwest"] = 0;
+    addEdge(10, "east", 11); addEdge(11, "west", 10);
+    addEdge(11, "east", 12); addEdge(12, "west", 11);
+    addEdge(10, "northwest", 0); addEdge(11, "northwest", 0); addEdge(12, "northwest", 0);
 
     // Persephone (13–15)
-    roomConnections[13]["east"] = 14; roomConnections[14]["west"] = 13;
-    roomConnections[14]["east"] = 15; roomConnections[15]["west"] = 14;
-    roomConnections[13]["north"] = 0; roomConnections[14]["north"] = 0; roomConnections[15]["north"] = 0;
+    addEdge(13, "east", 14); addEdge(14, "west", 13);
+    addEdge(14, "east", 15); addEdge(15, "west", 14);
+    addEdge(13, "north", 0); addEdge(14, "north", 0); addEdge(15, "north", 0);
 
     // Pan (16–18)
-    roomConnections[16]["east"] = 17; roomConnections[17]["west"] = 16;
-    roomConnections[17]["east"] = 18; roomConnections[18]["west"] = 17;
-    roomConnections[16]["northeast"] = 0; roomConnections[17]["northeast"] = 0; roomConnections[18]["northeast"] = 0;
+    addEdge(16, "east", 17); addEdge(17, "west", 16);
+    addEdge(17, "east", 18); addEdge(18, "west", 17);
+    addEdge(16, "northeast", 0); addEdge(17, "northeast", 0); addEdge(18, "northeast", 0);
 
     // False Hermes (19–21)
-    roomConnections[19]["east"] = 20; roomConnections[20]["west"] = 19;
-    roomConnections[20]["east"] = 21; roomConnections[21]["west"] = 20;
-    roomConnections[19]["east"] = 20; // already set above, removed overwrites
-    roomConnections[19]["north"] = 0; roomConnections[20]["north"] = 0; roomConnections[21]["north"] = 0;
+    addEdge(19, "east", 20); addEdge(20, "west", 19);
+    addEdge(20, "east", 21); addEdge(21, "west", 20);
+    addEdge(19, "north", 0); addEdge(20, "north", 0); addEdge(21, "north", 0);
 
     // Thanatos (22–24)
-    roomConnections[22]["east"] = 23; roomConnections[23]["west"] = 22;
-    roomConnections[23]["east"] = 24; roomConnections[24]["west"] = 23;
-    roomConnections[22]["southeast"] = 0; roomConnections[23]["southeast"] = 0; roomConnections[24]["southeast"] = 0;
+    addEdge(22, "east", 23); addEdge(23, "west", 22);
+    addEdge(23, "east", 24); addEdge(24, "west", 23);
+    addEdge(22, "southeast", 0); addEdge(23, "southeast", 0); addEdge(24, "southeast", 0);
 
     // Eris (25–28)
-    roomConnections[25]["east"] = 26; roomConnections[26]["west"] = 25;
-    roomConnections[26]["east"] = 27; roomConnections[27]["west"] = 26;
-    roomConnections[27]["east"] = 28; roomConnections[28]["west"] = 27;
-    roomConnections[25]["down"] = 0; roomConnections[26]["down"] = 0; roomConnections[27]["down"] = 0; roomConnections[28]["down"] = 0;
+    addEdge(25, "east", 26); addEdge(26, "west", 25);
+    addEdge(26, "east", 27); addEdge(27, "west", 26);
+    addEdge(27, "east", 28); addEdge(28, "west", 27);
+    addEdge(25, "down", 0); addEdge(26, "down", 0); addEdge(27, "down", 0); addEdge(28, "down", 0);
 }
+
 
 void Game::handleCommand(const std::string& input) {
     const std::string raw = trim_copy(input);
@@ -971,6 +1151,20 @@ if (cmd == "shrine") {
         return;
     }
 
+    // ===== Write (Melas free-write to current location) =====
+    if (toLower(first) == "write" || cmd == "write") {
+    const int cur = player.getCurrentRoom();
+    if (cur >= 0 && cur < static_cast<int>(rooms.size())) {
+        const std::string loc = toLocationId(rooms[cur].getName());
+        if (!loc.empty()) {
+            journalManager.writeMelasAt(loc);
+            std::cout << "(Journal updated.)\n";
+        } else {
+            std::cout << "Your hand hesitates. Nothing here wants to be recorded.\n";
+        }
+    }
+    return;
+}
     // ===== Help =====
     if (cmd == "help") {
         std::cout << "Commands:\n"
@@ -982,6 +1176,7 @@ if (cmd == "shrine") {
                   << "  note <entry#> <text>\n"
                   << "  inspect <entry#>\n"
                   << "  map (Main Hall only)\n"
+                  << "  write\n"
                   << "  help\n";
         return;
     }
@@ -1001,23 +1196,14 @@ void Game::toggleAccessibility() {
 // ===== PATCH 5: print-once loop stays; minor safety flush =====
 void Game::gameLoop() {
     isRunning = true;
-
-    if (!firstFramePrinted_) {
-        describeCurrentRoom();
-        firstFramePrinted_ = true;
-    }
-
+    // Do NOT call describeCurrentRoom() here.
     while (isRunning) {
-        std::cout << "\n> " << std::flush;
+        std::cout << "\n> ";
         std::string line;
         if (!std::getline(std::cin, line)) break;
-
-        if (line == "exit" || line == "quit") {
-            isRunning = false;
-            break;
-        }
-
+        if (line == "exit" || line == "quit") { isRunning = false; break; }
         handleCommand(line);
+        // No automatic room reprint here.
     }
 }
 

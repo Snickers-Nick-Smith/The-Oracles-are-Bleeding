@@ -1,4 +1,5 @@
 #include "Player.hpp"
+#include "utils.hpp"
 
 // --- Constructor ---
 Player::Player() : currentRoom(0), sanity(100) {}
@@ -15,19 +16,21 @@ void Player::loseSanity(int amount) {
 
 // --- Movement ---
 void Player::move(const std::string& direction,
-                  const std::unordered_map<int, std::unordered_map<std::string, int>>& roomConnections) {
+                  const std::unordered_map<int, std::unordered_map<std::string,int>>& roomConnections) {
     auto rcIt = roomConnections.find(currentRoom);
-    if (rcIt == roomConnections.end()) {
-        std::cout << "You can't move from here.\n";
-        return;
-    }
+    if (rcIt == roomConnections.end()) { std::cout << "You can't move from here.\n"; return; }
     const auto& exits = rcIt->second;
-    auto exIt = exits.find(direction);
-    if (exIt == exits.end()) {
-        std::cout << "You can't go that way.\n";
-        return;
-    }
-    currentRoom = exIt->second;
+
+    const std::string longDir  = normalize_dir(direction); // "n"->"north" or "" if invalid
+    const std::string shortDir = to_short_dir(longDir.empty() ? direction : longDir);
+
+    if (longDir.empty() && shortDir.empty()) { std::cout << "No exit that way.\n"; return; }
+
+    auto it = exits.find(longDir);
+    if (it == exits.end()) it = exits.find(shortDir);
+    if (it == exits.end()) { std::cout << "No exit that way.\n"; return; }
+
+    currentRoom = it->second;
 }
 
 // --- Journal Integration ---

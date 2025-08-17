@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string>
 
-// Note: we use split_first / normalize_dir / is_move_verb from utils.hpp
 namespace {
     void printPrologueHelpBanner() {
         std::cout
@@ -21,6 +20,9 @@ namespace {
 }
 
 void PrologueController::run() {
+    // Auto-flush every insertion during the prologue so banners/prompt lines appear immediately.
+    std::cout << std::unitbuf;
+
     // ---- Safe wrappers so empty std::function never throws ----
     auto safePrompt = [this]() -> std::string {
         return hooks_.promptPrefix ? hooks_.promptPrefix() : std::string("> ");
@@ -45,111 +47,78 @@ void PrologueController::run() {
     };
 
     constexpr int kMaxDays = 7;
-    std::cout << "\n(Prologue) Type 'help' for commands.\n" << std::flush;
+
+    // Print header + banner ONCE before the loop.
+    std::cout << "\n(Prologue) Type 'help' for commands.\n";
+    printPrologueHelpBanner();
 
     for (int day = 1; day <= kMaxDays; ++day) {
-        std::cout << "\n— Day " << day << " —\n" << std::flush;
+        std::cout << "\n— Day " << day << " —\n";
 
-        if (day == 1) {
-            // Show the banner BEFORE any room text
-            printPrologueHelpBanner();
-        }
-
-        // Show room, then exits immediately so directions are obvious
-        callDescribe();
-        callListExits();
+        // Ensure header is visibly out before the (chatty) describe path runs.
+        std::cout.flush();
+        callDescribe();          // (your describe also prints Exits)
 
         bool wrote = false, endDay = false;
         while (!endDay) {
             std::cout << safePrompt();
 
             std::string line;
-            if (!std::getline(std::cin, line)) return;
+            if (!std::getline(std::cin, line)) {
+                std::cout << std::nounitbuf; // restore
+                return;
+            }
 
             const std::string lineTrim = trim_copy(line);
-            if (lineTrim.empty()) continue; // ignore blank lines
+            if (lineTrim.empty()) continue;
 
             auto [cmdTok, restRaw] = split_first(lineTrim);
-            const std::string cmd = toLower(cmdTok);         // case-insensitive commands
-            const std::string rest = restRaw;                // keep rest as-typed (room titles)
+            const std::string cmd = toLower(cmdTok);
+            const std::string rest = restRaw;
             const std::string wholeLower = toLower(lineTrim);
 
-            // 1) bare directions (n, north, sw, up...)
             if (auto dir = normalize_dir(cmd); !dir.empty()) {
                 const bool moved = callMoveTo(dir);
                 if (moved) callDescribe();
                 continue;
             }
-
-            // 2) verb + direction (go/move/walk/run/head/travel <dir>), or neighbor title
             if (is_move_verb(cmd)) {
                 if (auto dir = normalize_dir(rest); !dir.empty()) {
                     const bool moved = callMoveTo(dir);
                     if (moved) callDescribe();
                 } else if (!rest.empty()) {
-                    const bool moved = callMoveTo(rest); // neighbor room title
+                    const bool moved = callMoveTo(rest);
                     if (moved) callDescribe();
                 } else {
                     std::cout << "Move where?\n";
                 }
                 continue;
             }
-
-            // help
-            if (cmd == "help") {
-                printPrologueHelpBanner();
-                continue;
-            }
-            // look / look around
-            if (cmd == "look" || wholeLower == "look around") {
-                callDescribe();
-                continue;
-            }
-            // exits
-            if (cmd == "exits") {
-                callListExits();
-                continue;
-            }
-            // where -> room + exits
-            if (cmd == "where") {
-                callDescribe();
-                callListExits();
-                continue;
-            }
-            // journal
-            if (cmd == "journal") {
-                callShowJournal();
-                continue;
-            }
-            // write (only once per day)
+            if (cmd == "help") { printPrologueHelpBanner(); continue; }
+            if (cmd == "look" || wholeLower == "look around") { callDescribe(); continue; }
+            if (cmd == "exits") { callListExits(); continue; }
+            if (cmd == "where") { callDescribe(); callListExits(); continue; }
+            if (cmd == "journal") { callShowJournal(); continue; }
             if (cmd == "write") {
-                if (wrote) {
-                    std::cout << "(You’ve already written today.)\n";
-                } else {
-                    callWriteJournal(day);
-                    wrote = true;
-                }
+                if (wrote) std::cout << "(You’ve already written today.)\n";
+                else { callWriteJournal(day); wrote = true; }
                 continue;
             }
-            // end-of-day (accept a few synonyms); require confirmation if not written
             if (cmd == "end" || cmd == "sleep" || cmd == "finish" || cmd == "next") {
-                if (!wrote) {
-                    std::cout << "(You haven’t written today. Type 'end' again to sleep anyway.)\n";
-                    wrote = true; // confirmation latch
-                } else {
-                    endDay = true;
-                }
+                if (!wrote) { std::cout << "(You haven’t written today. Type 'end' again to sleep anyway.)\n"; wrote = true; }
+                else { endDay = true; }
                 continue;
             }
-
             std::cout << "Unknown command. Type 'help'.\n";
         }
 
-        // your flavor text
         if (day == 2) std::cout << "Somewhere, a page turns though no one is there.\n";
         if (day == 4) std::cout << "The corridors feel longer tonight, but you arrive all the same.\n";
         if (day == 6) std::cout << "You wake from a dream you can’t recall—only warmth and candlelight.\n";
     }
 
     std::cout << "\nThe candle gutters. The temple is not as it was.\nPrologue complete.\n";
+
+    // Restore normal buffering once we exit the prologue.
+    std::cout << std::nounitbuf;
 }

@@ -14,6 +14,9 @@
 #include <vector>
 #include <string>
 
+
+enum class Phase { MainMenu, Intro, InGame };
+
 class Game {
 public:
     Game();
@@ -32,6 +35,7 @@ private:
     std::unordered_set<int> lysaiaShrinesLogged_;
     void runLysaiaPrologue();         // small 7-day loop, returns to menu when done
     void lysaiaDay(int day, Shrine& shrine); // if you keep per-day hooks
+    bool inPrologue_ = false;  // allow text during Lysaia, but skip Melas mechanics
 
     // ===== World / state =====
     Player player;
@@ -47,9 +51,24 @@ private:
 
     // ===== Setup =====
     void loadRooms();          // (if used by main game)
+    // --- Title lookup & wiring helpers ---
+int indexByTitle(const std::string& title) const;
+void addEdge(int from, const std::string& dirLong, int to);
+void addEdgeByTitle(const std::string& fromTitle, const std::string& dirLong, const std::string& toTitle);
+void addEdgeBothByTitle(const std::string& fromTitle, const std::string& dirLong,
+                        const std::string& toTitle,   const std::string& reverseDirLong);
+
+// Prologue wiring
+    void setupPrologueConnectionsByTitle();
+// Main wiring
     void setupConnections();   // connect rooms in current map
 
     // ===== Main game (Melas, etc.) =====
+    Phase phase_ = Phase::MainMenu;   // track where we are
+
+    void beginDescent();              // prints title/intro, waits for ENTER
+    void waitForEnter();
+    void printTitleBlock();
     void beginMelasRun();
     void gameLoop();           // full loop (not used by prologue)
     void handleCommand(const std::string& input);
@@ -61,6 +80,7 @@ private:
 
 
     // ===== Helpers =====
+    void syncInputAfterPrologue();
     // deity inference
     Deity deityFromShrineName(const std::string& name) const;
     Deity deityFromRoomName(const std::string& name) const;

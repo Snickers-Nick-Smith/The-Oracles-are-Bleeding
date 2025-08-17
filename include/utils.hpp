@@ -45,5 +45,9 @@ void shakeLine(std::string_view text,
                int durationMs = 200,
                int baseIndent = 0,
                bool commitLine = true);
-
+               
+std::string to_short_dir(const std::string& longDir);  // "north" -> "n"
+std::string expand_dir(const std::string& shortDir);   // "n" -> "north"
+std::string normalize_dir(std::string d);             
+bool is_move_verb(const std::string& w);  
 #endif // UTILS_HPP

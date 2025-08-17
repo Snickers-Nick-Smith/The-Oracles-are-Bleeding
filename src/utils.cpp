@@ -122,37 +122,81 @@ void flush() {
         return { toLower(first), trim_copy(rest) };
     }
 
-    // Normalize direction tokens: supports full, hyphenless, and short forms.
-    // Returns empty string if not a direction.
-    std::string normalize_dir(std::string d) {
-        d = toLower(d);
-        if (d == "n")  return "north";
-        if (d == "s")  return "south";
-        if (d == "e")  return "east";
-        if (d == "w")  return "west";
-        if (d == "ne") return "northeast";
-        if (d == "nw") return "northwest";
-        if (d == "se") return "southeast";
-        if (d == "sw") return "southwest";
-        if (d == "u" || d == "up") return "up";
-        if (d == "d" || d == "down") return "down";
-        // already full word? pass through if valid
-        static const std::vector<std::string> dirs = {
-            "north","south","east","west",
-            "northeast","northwest","southeast","southwest",
-            "up","down"
-        };
-        return (std::find(dirs.begin(), dirs.end(), d) != dirs.end()) ? d : std::string{};
-    }
+  // Normalize direction tokens: supports full, hyphenless, and short forms.
+// Returns empty string if not a direction.
+std::string normalize_dir(std::string d) {
+    d = toLower(d);
+    if (d == "n")  return "north";
+    if (d == "s")  return "south";
+    if (d == "e")  return "east";
+    if (d == "w")  return "west";
+    if (d == "ne") return "northeast";
+    if (d == "nw") return "northwest";
+    if (d == "se") return "southeast";
+    if (d == "sw") return "southwest";
+    if (d == "u" || d == "up") return "up";
+    if (d == "d" || d == "down") return "down";
 
-    bool is_move_verb(const std::string& w) {
-        return w == "go" || w == "move" || w == "walk" || w == "run" || w == "head" || w == "travel";
-    }
+    // already full word? pass through if valid
+    static const std::vector<std::string> dirs = {
+        "north","south","east","west",
+        "northeast","northwest","southeast","southwest",
+        "up","down"
+    };
+    return (std::find(dirs.begin(), dirs.end(), d) != dirs.end()) ? d : std::string{};
+}
+
+// Convert a long form direction to its short alias (north -> n).
+std::string to_short_dir(const std::string& longDir) {
+    std::string d = toLower(longDir);
+    if (d == "north")      return "n";
+    if (d == "south")      return "s";
+    if (d == "east")       return "e";
+    if (d == "west")       return "w";
+    if (d == "northeast")  return "ne";
+    if (d == "northwest")  return "nw";
+    if (d == "southeast")  return "se";
+    if (d == "southwest")  return "sw";
+    if (d == "up")         return "u";
+    if (d == "down")       return "d";
+
+    // Already short? return as-is.
+    if (d == "n"||d=="s"||d=="e"||d=="w"||
+        d=="ne"||d=="nw"||d=="se"||d=="sw"||
+        d=="u"||d=="d")
+        return d;
+
+    return {};
+}
+
+// Convert a short alias to its long form (n -> north).
+std::string expand_dir(const std::string& shortDir) {
+    std::string d = toLower(shortDir);
+    if (d == "n")  return "north";
+    if (d == "s")  return "south";
+    if (d == "e")  return "east";
+    if (d == "w")  return "west";
+    if (d == "ne") return "northeast";
+    if (d == "nw") return "northwest";
+    if (d == "se") return "southeast";
+    if (d == "sw") return "southwest";
+    if (d == "u")  return "up";
+    if (d == "d")  return "down";
+    return d; // already long or unknown
+}
+
+bool is_move_verb(const std::string& w) {
+    return w == "go" || w == "move" || w == "walk" ||
+           w == "run" || w == "head" || w == "travel";
+}
 
 std::string ansi(std::string_view seq) {
     if (!ansiCapable()) return std::string{};
     return std::string(seq);
 }
+
+
+
 
 // ============================================================================
 // Effects

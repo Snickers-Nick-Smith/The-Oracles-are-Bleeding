@@ -59,7 +59,7 @@ void TempleMap::populateFromDesign() {
 
     // Thanatos (id 7)
     addNode("Room of Waiting Lights", false);
-    addNode("Waiting Room", false);
+    addNode("The Bloodclock", false);
     addNode("Sleepwalker’s Alcove", true);
 
     // Eris (id 8) — 3 non‑shrine + shrine
@@ -79,7 +79,7 @@ void TempleMap::populateFromDesign() {
     linkTriad("Hall of Petals","Orchard Walk","The Frozen Spring");
     linkTriad("Hall of Shivering Meat","Den of Antlers","Wild Rotunda");
     linkTriad("Room of Borrowed Things","Whispering Hall","Gilded Hallway");
-    linkTriad("Room of Waiting Lights","Waiting Room","Sleepwalker’s Alcove");
+    linkTriad("Room of Waiting Lights","The Bloodclock","Sleepwalker’s Alcove");
     // Eris chain: wake -> cell -> throat -> shrine
     addEdgeByName("Oracle’s Wake","Archivist’s Cell");
     addEdgeByName("Archivist’s Cell","Throat of the Temple");
@@ -123,7 +123,7 @@ void TempleMap::printAscii() const {
     std::cout << pad("Orchard Walk",22)     << "  "
               << pad("Den of Antlers",22)         << "  "
               << pad("Whispering Hall",22)        << "  "
-              << pad("Waiting Room",22)         << "\n";
+              << pad("The Bloodclock",22)         << "\n";
     std::cout << pad("== The Frozen Spring ==",22)<< "--"
               << pad("== Wild Rotunda ==",22)     << "--"
               << pad("== Gilded Hallway ==",22)   << "--"
